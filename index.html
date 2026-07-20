@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<title>Projekt Lifestealer – v46 saves a rozšířené levely</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#15110e;color:#f5ead2;font-family:Georgia,"Times New Roman",serif}.wrap{max-width:1180px;margin:0 auto;padding:14px;display:grid;grid-template-columns:1fr 270px;gap:14px}.panel,.gamebox{background:#231b16;border:4px solid #4b382b;box-shadow:0 0 0 4px #0c0907}.gamebox{padding:8px;position:relative}canvas{width:100%;display:block;image-rendering:pixelated;border:3px solid #84613f}.panel{padding:12px}h1{margin:0 0 8px;color:#ffd98a;font-size:24px}h2{margin:14px 0 7px;color:#ffd98a;font-size:18px}p{margin:7px 0;line-height:1.35}.stat{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid #4b382b;padding:5px 0}.log{height:220px;overflow:auto;background:#140f0c;border:2px solid #4b382b;padding:8px;font-size:13px}button{background:#ffd98a;color:#1c1712;border:0;padding:9px 12px;margin:4px 4px 4px 0;font-weight:bold;cursor:pointer;font-family:Georgia,"Times New Roman",serif}.hint{color:#ffd98a}.small{font-size:13px;opacity:.9}.intro-overlay{position:absolute;inset:8px;background:rgba(10,7,5,.78);display:flex;align-items:center;justify-content:center;z-index:5}.parchment{max-width:700px;background:linear-gradient(180deg,#d7bd83 0%,#b8965f 100%);color:#241207;border:10px solid #6f4928;box-shadow:0 0 0 4px #2b160b,0 12px 34px rgba(0,0,0,.65);padding:22px 26px;position:relative}.parchment:before,.parchment:after{content:"";position:absolute;left:12px;right:12px;height:10px;background:rgba(111,71,34,.25)}.parchment:before{top:8px}.parchment:after{bottom:8px}.parchment h2{margin:0 0 10px;color:#381406;font-size:28px;text-align:center;letter-spacing:.5px}.parchment p{margin:10px 0;line-height:1.45}.parchment .quote{font-style:italic;color:#4a1f0e}.start-btn{background:#5b2e16;color:#f3dfbb;padding:11px 18px;border:2px solid #2d1307;margin-top:10px}.start-btn:hover{filter:brightness(1.12)}
+
+.menu-overlay{position:absolute;inset:8px;background:radial-gradient(circle at 50% 30%,rgba(52,33,45,.92),rgba(7,5,7,.97));display:flex;align-items:center;justify-content:center;z-index:12}
+.menu-card{width:min(680px,92%);padding:30px 34px;background:linear-gradient(180deg,#211820,#120e13);border:4px solid #8b6745;box-shadow:0 0 0 5px #090608,0 20px 60px rgba(0,0,0,.65);text-align:center;position:relative}
+.menu-card:before,.menu-card:after{content:"";position:absolute;left:16px;right:16px;height:2px;background:#9f7852}.menu-card:before{top:14px}.menu-card:after{bottom:14px}
+.menu-kicker{font-size:12px;letter-spacing:4px;color:#ad8f78;text-transform:uppercase}.menu-title{font-size:42px;letter-spacing:4px;margin:7px 0 10px;color:#e9d1ad;text-shadow:0 3px 0 #3b2219}.menu-subtitle{color:#bfae9b;margin:0 auto 18px;max-width:520px}
+.menu-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px}.menu-actions button{min-width:150px}.menu-actions .primary{background:#8f3e27;color:#fff0d7}.menu-actions .danger{background:#3a2525;color:#e7c7c7}.menu-save{margin:16px auto;padding:10px;background:#0d0a0d;border:1px solid #5e493d;color:#cdbfae;max-width:520px}.menu-note{font-size:12px;color:#8e8278}
+.save-badge{font-size:12px;padding:4px 7px;border:1px solid #5d4a3b;background:#130f0d;color:#c9b390}.room-banner{position:absolute;left:50%;top:18px;transform:translateX(-50%);z-index:2;pointer-events:none;background:rgba(12,9,11,.72);border:1px solid #8b6745;color:#e8d5b3;padding:5px 12px;font-size:13px;letter-spacing:1px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}.panel{order:2}.menu-title{font-size:32px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="gamebox">
+
+<div id="menuOverlay" class="menu-overlay">
+  <div class="menu-card">
+    <div class="menu-kicker">dark fantasy browser RPG</div>
+    <div class="menu-title">LIFESTEALER</div>
+    <p class="menu-subtitle">Ukradni duši poraženého. Přijmi jeho tělo. Pokračuj hlouběji — dokud proti tobě nestaneš ty sám.</p>
+    <div id="menuSaveInfo" class="menu-save">Hledám uloženou hru…</div>
+    <div class="menu-actions">
+      <button id="newGameBtn" class="primary">Nová hra</button>
+      <button id="continueBtn">Pokračovat</button>
+      <button id="exportSaveBtn">Export save</button>
+      <button id="importSaveBtn">Import save</button>
+      <button id="deleteSaveBtn" class="danger">Smazat save</button>
+    </div>
+    <input id="importSaveInput" type="file" accept="application/json" hidden>
+    <p class="menu-note">Autosave se vytvoří na začátku místnosti a před bossem.</p>
+  </div>
+</div>
+<div id="roomBanner" class="room-banner">-</div>
+
+<div id="introOverlay" class="intro-overlay">
+  <div class="parchment">
+    <h2 id="storyTitle">Projekt Lifestealer</h2>
+    <div id="storyContent">
+      <p>Lifestealer vstupuje do starého hradu, kde sídlí mocní strážci. Každý z nich skrývá něco, co stojí za to ukrást — sílu, život i duši.</p>
+      <p>O hradu se říká jen jediné: kdo vejde dovnitř, už nikdy neodchází stejný.</p>
+    </div>
+    <button id="startStoryBtn" class="start-btn">Vstoupit do hradu</button>
+  </div>
+</div>
+<canvas id="game" width="900" height="430"></canvas>
+</div>
+<div class="panel">
+<h1>Projekt Lifestealer</h1><p id="status">Načítám hru…</p>
+<h2>Ovládání</h2><p>A / ←, D / → pohyb</p><p>W / ↑ skok</p><p>Mezerník útok</p><p><strong>R spell</strong></p><p>L skip pro testování</p><p>E vstup do otevřené brány</p>
+<h2>Stav</h2>
+<div class="stat"><span>Podoba</span><strong id="formStatus">-</strong></div>
+<div class="stat"><span>Fáze</span><strong id="stageStatus">-</strong></div>
+<div class="stat"><span>HP</span><strong id="hpStatus">-</strong></div>
+<div class="stat"><span>Životy</span><strong id="lifeStatus">-</strong></div>
+<div class="stat"><span>Spell</span><strong id="spellStatus">-</strong></div>
+<div class="stat"><span>Boss</span><strong id="bossStatus">-</strong></div>
+<div class="stat"><span>Postup místnosti</span><strong id="scoreStatus">0</strong></div>
+<div class="stat"><span>Save</span><strong id="saveStatus" class="save-badge">-</strong></div>
+<h2>Log</h2><div id="log" class="log"></div>
+<h2>Akce</h2><button id="restartBtn">Hlavní menu</button><button id="skipBtn">Skip dál</button>
+<p class="small hint">Lifestealer: porazíš bosse → vezmeš si jeho duši → staneš se jím → pokračuješ jako on.</p>
+</div>
+</div>
+<script>
+(()=>{
+const canvas=document.getElementById("game"),ctx=canvas.getContext("2d");
+const statusEl=document.getElementById("status"),formStatusEl=document.getElementById("formStatus"),stageStatusEl=document.getElementById("stageStatus"),hpStatusEl=document.getElementById("hpStatus"),lifeStatusEl=document.getElementById("lifeStatus"),spellStatusEl=document.getElementById("spellStatus"),bossStatusEl=document.getElementById("bossStatus"),scoreStatusEl=document.getElementById("scoreStatus"),saveStatusEl=document.getElementById("saveStatus"),logEl=document.getElementById("log"),introOverlay=document.getElementById("introOverlay"),startStoryBtn=document.getElementById("startStoryBtn"),storyTitleEl=document.getElementById("storyTitle"),storyContentEl=document.getElementById("storyContent"),menuOverlay=document.getElementById("menuOverlay"),menuSaveInfo=document.getElementById("menuSaveInfo"),newGameBtn=document.getElementById("newGameBtn"),continueBtn=document.getElementById("continueBtn"),exportSaveBtn=document.getElementById("exportSaveBtn"),importSaveBtn=document.getElementById("importSaveBtn"),deleteSaveBtn=document.getElementById("deleteSaveBtn"),importSaveInput=document.getElementById("importSaveInput"),roomBanner=document.getElementById("roomBanner");
+const groundY=330,SCORE_PER_ENEMY=40,BOSS_SCORE=200;
+const keys={left:false,right:false};
+let gameOver=false,playerDead=false,respawnAt=0,playerLastMoveTime=Date.now(),stageIndex=0,stageScore=0,bossFight=false,nextEnemyId=1,nextProjectileId=1,activeSpellUntil=0,playerCharging=null,finalTriggered=false,introOpen=false,storyOpen=false,pendingStoryAction=null,menuOpen=true,roomIndex=0,roomKills=0,roomCleared=false,bossCheckpoint=false,hazardLastHit=0,lastSaveLabel="-",ambientParticles=[];
+let enemies=[],projectiles=[],allies=[],animations=[],spellCooldowns={hunter:0,templar:0,mage:0,assassin:0,necromancer:0};
+const FORMS={
+hero:{label:"Lifestealer",maxHp:10,lives:3,speed:4,damage:3,range:82,cooldown:650,spellName:"žádný spell"},
+hunter:{label:"Hunter",maxHp:10,lives:3,speed:4.05,damage:3,range:340,cooldown:920,spellName:"Marksman Shot"},
+templar:{label:"Templar",maxHp:17,lives:5,speed:3.1,damage:6,range:94,cooldown:740,spellName:"Thorn Armor"},
+mage:{label:"Mage",maxHp:8,lives:2,speed:4,damage:4,range:999,cooldown:900,spellName:"Knockback"},
+assassin:{label:"Assassin",maxHp:10,lives:3,speed:5.25,damage:3,range:92,cooldown:480,spellName:"Vanish Ambush"},
+necromancer:{label:"Necromancer",maxHp:13,lives:3,speed:3.7,damage:8,range:450,cooldown:760,spellName:"Summon Skeleton"}
+};
+const STAGES=[
+{title:"Venek před hradem",env:"outside",form:"hero",boss:"hunterBoss",nextForm:"hunter",nextText:"Porazil jsi Huntera. Teď pokračuješ jako on.",enemies:["bandit"]},
+{title:"Hradní brána",env:"gate",form:"hunter",boss:"templarBoss",nextForm:"templar",nextText:"Templář padl. Přebíráš jeho tělo a štít.",enemies:["warrior","archer"]},
+{title:"Kaple",env:"chapel",form:"templar",boss:"mageBoss",nextForm:"mage",nextText:"Kaple ztichla. Stáváš se Magem.",enemies:["warrior","chapelMage"]},
+{title:"Temné chodby",env:"dungeon",form:"mage",boss:"assassinBoss",nextForm:"assassin",nextText:"Assassinova maska je tvoje. Pokračuješ jako on.",enemies:["assassinMinion","warrior"]},
+{title:"Trůnní místnost",env:"throne",form:"assassin",boss:"necromancerBoss",nextForm:"necromancer",nextText:"Necromancer je poražen. Ale jeho tělo vstává — a jsi v něm ty.",enemies:["warrior","assassinMinion"]},
+{title:"Zrcadlo duše",env:"mirror",form:"necromancer",boss:"originalHero",nextForm:null,nextText:"Tvoje první podoba se vrací.",enemies:[]}
+
+
+];
+const SAVE_KEY="lifestealer-save-v2";
+const SAVE_VERSION=2;
+const ROOM_CONFIG={
+  outside:[
+    {name:"Zarostlá stezka",target:3,enemies:["bandit"],hazard:null,prop:"ruins"},
+    {name:"Mokřad pod hradbami",target:4,enemies:["bandit","archer"],hazard:"bog",prop:"marsh"}
+  ],
+  gate:[
+    {name:"Vnější opevnění",target:4,enemies:["warrior","archer"],hazard:null,prop:"banners"},
+    {name:"Rozbitý padací most",target:5,enemies:["warrior","archer"],hazard:"spikes",prop:"chains"}
+  ],
+  chapel:[
+    {name:"Loď beze zpěvu",target:4,enemies:["warrior","chapelMage"],hazard:null,prop:"pews"},
+    {name:"Znesvěcený oltář",target:5,enemies:["warrior","chapelMage"],hazard:"rune",prop:"altar"}
+  ],
+  dungeon:[
+    {name:"Chodba masek",target:5,enemies:["assassinMinion","warrior"],hazard:null,prop:"cells"},
+    {name:"Studna stínů",target:5,enemies:["assassinMinion","warrior"],hazard:"shadow",prop:"pit"}
+  ],
+  throne:[
+    {name:"Síň padlých",target:5,enemies:["warrior","assassinMinion"],hazard:null,prop:"statues"},
+    {name:"Před trůnem",target:6,enemies:["warrior","assassinMinion"],hazard:"necrotic",prop:"throne"}
+  ]
+};
+const WEAPON_STYLES={
+  bandit:["sword","axe","hammer"],
+  warrior:["shield","axe","hammer","greatsword"],
+  assassinMinion:["daggers","poison","shadow"],
+  archer:["shortbow","longbow"]
+};
+const STORY_PANELS={
+  intro:{
+    title:"Projekt Lifestealer",
+    button:"Vstoupit do ticha",
+    paragraphs:[
+      "Na okraji zapomenutého kraje stojí hrad, který se v mapách neudržel. Cesty k němu zarůstají, ale stopy z něj nikdy nevedou zpět.",
+      "K jeho bráně přichází Lifestealer. Ne kvůli slávě. Ne kvůli království. Jen proto, že uvnitř stále hoří duše, které odmítly zemřít."
+    ]
+  },
+  hunter:{
+    title:"Duše lovce",
+    button:"Vzít jeho dech",
+    paragraphs:[
+      "Lovec padl. Jeho šíp se zlomil, ale jeho hlad po kořisti zůstal viset ve vzduchu.",
+      "Lifestealer položil ruku na chladnou hruď poraženého. Cizí dech se stal jeho dechem. Cizí oko jeho okem.",
+      "Brána neotevřela cestu dál. Jen přijala nového lovce."
+    ]
+  },
+  templar:{
+    title:"Přísaha v železe",
+    button:"Obléct přísahu",
+    paragraphs:[
+      "Templář neklečel ani po smrti. Jeho tělo držela přísaha silnější než krev.",
+      "Když ji Lifestealer vzal, ucítil tíhu štítu, kovu a viny. Každá rána se mohla vrátit zpět. Každé vítězství něco stálo.",
+      "Za bránou nebylo požehnání. Jen kaple, kde se už dávno nikdo nemodlí."
+    ]
+  },
+  mage:{
+    title:"Kaple bez boha",
+    button:"Přijmout modrý plamen",
+    paragraphs:[
+      "Mág zemřel pod rozbitými okny. Z barevného skla na zem dopadalo světlo, které už nic neposvěcovalo.",
+      "Jeho kouzla se nevytratila. Plazila se do Lifestealerových prstů jako studený plamen, který netrhá maso, ale odhazuje těla od sebe.",
+      "A v tom plameni bylo slyšet řetězy. Ne kovové. Duševní."
+    ]
+  },
+  assassin:{
+    title:"Tvář ve stínu",
+    button:"Nasadit masku",
+    paragraphs:[
+      "Assassin neprosil. Stín nikdy neprosí, jen čeká, až si ho někdo oblékne.",
+      "Lifestealer přijal jeho masku a poprvé zahlédl chodby tak, jak je vidí mrtví: bez dveří, bez času, bez úniku.",
+      "Na konci ticha čekal trůn. A na trůnu ten, kdo svázal všechny ostatní."
+    ]
+  },
+  necromancer:{
+    title:"Král posledních dechů",
+    button:"Přijmout poslední tělo",
+    paragraphs:[
+      "Necromancer padl, ale nespadl do strachu. Usmál se, jako by právě dokončil dlouhou modlitbu.",
+      "„Cizí duše se kradou snadno,“ zašeptal. „Vlastní duše má však zuby.“",
+      "Lifestealer vzal i jeho tělo. A hrad konečně ukázal, co skrýval pod trůnem."
+    ]
+  },
+  final:{
+    title:"Duše, která neuhne",
+    button:"Uzavřít kruh",
+    paragraphs:[
+      "Na konci nestál další pán hradu. Stál tam první Lifestealer — ten, který kdysi vešel dovnitř bez cizí tváře.",
+      "Nebyl silnější díky ukradeným duším. Byl silnější proto, že žádnou nepotřeboval.",
+      "Kdo se žene za slávou mrtvých, může zapomenout, že vlastní jméno mělo váhu už před první krádeží."
+    ]
+  }
+};
+
+const BOSS_INTROS={
+  hunterBoss:{
+    title:"Hunter Boss — První lovec",
+    button:"Vstoupit do lovu",
+    paragraphs:[
+      "Na nádvoří stojí ten, který kdysi střežil první dech všech vetřelců.",
+      "Není nepřemožitelný, ale jeho šíp trestá nepozornost. První pán hradu zkouší trpělivost víc než sílu."
+    ]
+  },
+  templarBoss:{
+    title:"Templar Boss — Železná přísaha",
+    button:"Rozbít přísahu",
+    paragraphs:[
+      "U hradní brány čeká rytíř, kterého pohromadě nedrží víra, ale přísaha starší než krev.",
+      "Jeho štít nechrání jen tělo. Vrací údery zpět tomu, kdo je vyšle."
+    ]
+  },
+  mageBoss:{
+    title:"Mage Boss — Modrý plamen",
+    button:"Vstoupit do kaple",
+    paragraphs:[
+      "V kapli se modlí už jen světlo. U oltáře čeká mág, jehož kouzla netrhají — odhazují.",
+      "Nepřibližuj se k němu bez rozmyslu. Když ho zatlačíš, odhodí tě od sebe jako popel."
+    ]
+  },
+  assassinBoss:{
+    title:"Assassin Boss — Tvář beze jména",
+    button:"Sestoupit do stínu",
+    paragraphs:[
+      "V temných chodbách není ticho prázdné. Někdo v něm dýchá.",
+      "Assassin se ukáže jen tehdy, když už je pozdě. Jediný krok navíc může rozhodnout."
+    ]
+  },
+  necromancerBoss:{
+    title:"Necromancer — Král posledních dechů",
+    button:"Přijmout pád",
+    paragraphs:[
+      "Na trůnu sedí ten, kdo z mrtvých neudělal sluhy, ale ozvěny.",
+      "Jeho lebky pronásledují živé. Jeho kostlivci přicházejí v houfech, dokud jeho vůle trvá."
+    ]
+  }
+};
+const TYPES={
+bandit:{name:"Bandita",hp:9,damage:2,speed:.85,cooldown:1550,w:42,h:64},warrior:{name:"Válečník",hp:12,damage:3,speed:.72,cooldown:1750,w:46,h:66},archer:{name:"Lukostřelec",hp:9,damage:3,speed:.7,cooldown:2100,w:40,h:64},chapelMage:{name:"Kaplový mág",hp:8,damage:2,speed:.68,cooldown:2500,w:40,h:64},assassinMinion:{name:"Stín",hp:9,damage:3,speed:1.18,cooldown:1250,w:38,h:62},skeleton:{name:"Kostlivec",hp:7,damage:3,speed:1.15,cooldown:1050,w:34,h:58},
+hunterBoss:{name:"Hunter Boss",hp:28,damage:2,speed:.68,cooldown:2300,w:58,h:78,isBoss:true},templarBoss:{name:"Templar Boss",hp:58,damage:4,speed:.58,cooldown:1450,w:62,h:82,isBoss:true},mageBoss:{name:"Mage Boss",hp:48,damage:4,speed:.78,cooldown:1800,w:58,h:78,isBoss:true},assassinBoss:{name:"Assassin Boss",hp:46,damage:4,speed:1.08,cooldown:850,w:48,h:72,isBoss:true},necromancerBoss:{name:"Necromancer",hp:68,damage:4,speed:.62,cooldown:2100,w:58,h:78,isBoss:true},originalHero:{name:"Původní Lifestealer",hp:44,damage:1,speed:.82,cooldown:1500,w:44,h:64,isBoss:true}
+};
+let player={form:"hero",x:90,y:groundY-64,baseY:groundY-64,w:42,h:64,hp:10,maxHp:10,lives:3,maxLives:3,speed:4,facing:1,vy:0,isJumping:false,lastAttack:0,invisible:false,ambushReadyUntil:0,thornUntil:0};
+function stage(){return STAGES[stageIndex]}function formDef(){return FORMS[player.form]}
+function currentRoom(){
+  const rooms=ROOM_CONFIG[stage().env];
+  return rooms?rooms[Math.max(0,Math.min(roomIndex,rooms.length-1))]:null;
+}
+function roomName(){return bossFight?"Boss aréna":(currentRoom()?currentRoom().name:"Zrcadlo duše")}
+function roomTarget(){return currentRoom()?currentRoom().target:0}
+function roomEnemyPool(){return currentRoom()?currentRoom().enemies:stage().enemies}
+function maxRoomEnemies(){return Math.min(3,2+roomIndex+(stageIndex>=3?1:0))}
+function chooseWeaponStyle(type,id){
+  const styles=WEAPON_STYLES[type];
+  if(!styles)return type==="skeleton"?"boneSword":"default";
+  return styles[Math.abs(id+stageIndex*3+roomIndex*5)%styles.length];
+}
+function safeStorageGet(){try{return localStorage.getItem(SAVE_KEY)}catch(e){return null}}
+function safeStorageSet(value){try{localStorage.setItem(SAVE_KEY,value);return true}catch(e){log("Save se nepodařilo uložit v tomto režimu prohlížeče.");return false}}
+function safeStorageRemove(){try{localStorage.removeItem(SAVE_KEY)}catch(e){}}
+function readSave(){
+  try{const raw=safeStorageGet();if(!raw)return null;const data=JSON.parse(raw);if(!data||data.version!==SAVE_VERSION)return null;return data}catch(e){return null}
+}
+function saveGame(reason="checkpoint",override={}){
+  if(menuOpen||stageIndex<0)return false;
+  const data={version:SAVE_VERSION,stageIndex,roomIndex,bossCheckpoint,finalMirror:stageIndex===5,form:player.form,lives:player.lives,maxLives:player.maxLives,hp:Math.max(1,player.hp),savedAt:new Date().toISOString(),reason,...override};
+  if(safeStorageSet(JSON.stringify(data))){lastSaveLabel="uloženo";refreshSaveUi(data);return true}return false;
+}
+function refreshSaveUi(data=readSave()){
+  if(saveStatusEl)saveStatusEl.textContent=data?"autosave":"bez save";
+  if(menuSaveInfo){
+    if(data){const st=STAGES[Math.min(data.stageIndex,STAGES.length-1)];const when=new Date(data.savedAt);menuSaveInfo.textContent=`Uloženo: ${st?st.title:"Neznámá fáze"} • místnost ${(data.roomIndex||0)+1} • ${when.toLocaleString("cs-CZ")}`}
+    else menuSaveInfo.textContent="Žádná uložená hra. Začni novou cestu.";
+  }
+  if(continueBtn)continueBtn.disabled=!data;
+  if(exportSaveBtn)exportSaveBtn.disabled=!data;
+  if(deleteSaveBtn)deleteSaveBtn.disabled=!data;
+}
+function showMainMenu(){
+  menuOpen=true;introOpen=false;storyOpen=false;keys.left=false;keys.right=false;
+  if(menuOverlay)menuOverlay.style.display="flex";
+  if(introOverlay)introOverlay.style.display="none";
+  refreshSaveUi();
+}
+function hideMainMenu(){menuOpen=false;if(menuOverlay)menuOverlay.style.display="none"}
+function resetRuntime(){
+  gameOver=false;playerDead=false;respawnAt=0;nextEnemyId=1;nextProjectileId=1;spellCooldowns={hunter:0,templar:0,mage:0,assassin:0,necromancer:0};
+  enemies=[];projectiles=[];allies=[];animations=[];logEl.innerHTML="";stageIndex=0;stageScore=0;roomIndex=0;roomKills=0;roomCleared=false;bossCheckpoint=false;activeSpellUntil=0;finalTriggered=false;playerCharging=null;hazardLastHit=0;
+  applyForm("hero",true);player.x=90;player.y=player.baseY;player.vy=0;player.isJumping=false;
+}
+function newGame(){resetRuntime();hideMainMenu();setupIntroStory();startStage(0,0,true);log("Nová cesta začala.");}
+function continueGame(){
+  const data=readSave();if(!data){refreshSaveUi();return}
+  resetRuntime();hideMainMenu();introOpen=false;storyOpen=false;
+  stageIndex=Math.max(0,Math.min(data.stageIndex,STAGES.length-1));roomIndex=Math.max(0,Math.min(data.roomIndex||0,1));bossCheckpoint=!!data.bossCheckpoint;
+  applyForm(stage().form,true);player.lives=Math.max(1,Math.min(data.lives||player.maxLives,player.maxLives));player.hp=Math.max(1,Math.min(data.hp||player.maxHp,player.maxHp));
+  player.x=45;player.y=player.baseY;initAmbientParticles();
+  if(stageIndex===5){enterFinalMirrorStage();return}
+  if(bossCheckpoint){startBossFight();return}
+  roomKills=0;roomCleared=false;statusEl.textContent=`Pokračování: ${stage().title} — ${roomName()}.`;refillEnemies();updateUi();
+}
+function exportSave(){
+  const data=readSave();if(!data)return;const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="lifestealer-save.json";a.click();setTimeout(()=>URL.revokeObjectURL(url),500);
+}
+function importSaveFile(file){
+  const reader=new FileReader();reader.onload=()=>{try{const data=JSON.parse(reader.result);if(!data||data.version!==SAVE_VERSION)throw new Error("version");safeStorageSet(JSON.stringify(data));refreshSaveUi(data);menuSaveInfo.textContent="Save importován. Teď můžeš pokračovat."}catch(e){menuSaveInfo.textContent="Soubor není platný save pro tuto verzi."}};reader.readAsText(file);
+}
+function initAmbientParticles(){ambientParticles=Array.from({length:40},(_,i)=>({x:Math.random()*canvas.width,y:Math.random()*canvas.height,s:0.25+Math.random()*0.65,size:1+Math.floor(Math.random()*3),phase:Math.random()*Math.PI*2}))}
+function log(m){let d=document.createElement("div");d.textContent="• "+m;logEl.prepend(d)}function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a}function rollDie(s){return Math.floor(Math.random()*s)+1}
+function addAnimation(type,text,x=450,y=120){animations.push({type,text,x,y,timer:80,maxTimer:80})}function addFloat(text,x,y,kind="neutral"){animations.push({type:"float",text,x,y,kind,timer:55,maxTimer:55})}
+function playerCenterX(){return player.x+player.w/2}function enemyCenterX(e){return e.x+e.w/2}function distanceTo(e){return Math.abs(playerCenterX()-enemyCenterX(e))}function clampPlayerX(){player.x=Math.max(0,Math.min(canvas.width-player.w,player.x))}
+function currentPlatforms(){if(!bossFight)return[];let env=stage().env;if(env==="outside")return[{x:150,y:248,w:170,h:16},{x:575,y:218,w:170,h:16}];if(env==="gate")return[{x:140,y:240,w:170,h:16},{x:590,y:214,w:170,h:16}];if(env==="chapel")return[{x:145,y:238,w:165,h:16},{x:590,y:208,w:165,h:16}];if(env==="dungeon")return[{x:120,y:250,w:170,h:16},{x:610,y:220,w:170,h:16}];return[{x:130,y:246,w:170,h:16},{x:600,y:214,w:170,h:16}]}
+function platformBlocksProjectile(p){return currentPlatforms().some(pl=>p.x+p.r>pl.x&&p.x-p.r<pl.x+pl.w&&p.y+p.r>pl.y&&p.y-p.r<pl.y+pl.h)}
+function createEnemy(type,x){
+  const t=TYPES[type],id=nextEnemyId++,bonus=1+(t.isBoss?stageIndex*.05:stageIndex*.04),hp=Math.ceil(t.hp*bonus),weaponStyle=chooseWeaponStyle(type,id);
+  return{id,type,name:t.name,x,y:groundY-t.h,w:t.w,h:t.h,hp,maxHp:hp,damage:t.damage,speed:t.speed,cooldown:t.cooldown,isBoss:!!t.isBoss,weaponStyle,facing:x<player.x?1:-1,lastAttack:0,lastShot:0,lastSpell:0,lastSummon:0,invisible:false,aimingUntil:0,marksmanReadyAt:Date.now()+3000,closeStart:0,thornUntil:0,nextThornAt:Date.now()+2800,vanishUntil:0,expiresAt:type==="skeleton"?Date.now()+5600:null}
+}
+function applyForm(f,resetLives=true){let d=FORMS[f];player.form=f;player.maxHp=d.maxHp;player.hp=d.maxHp;player.speed=d.speed;player.invisible=false;player.ambushReadyUntil=0;player.thornUntil=0;activeSpellUntil=0;playerCharging=null;if(resetLives){player.maxLives=d.lives;player.lives=d.lives}}
+function startStage(i,startRoomIndex=0,fromNewGame=false){
+  stageIndex=i;stageScore=0;bossFight=false;bossCheckpoint=false;enemies=[];projectiles=[];allies=[];finalTriggered=false;roomIndex=startRoomIndex;roomKills=0;roomCleared=false;hazardLastHit=0;
+  applyForm(stage().form,true);player.x=45;player.y=player.baseY;player.vy=0;player.isJumping=false;initAmbientParticles();
+  statusEl.textContent=`Fáze: ${stage().title}. Místnost: ${roomName()}.`;log(`Popel se pohnul. ${stage().title} — ${roomName()}.`);
+  if(stageIndex<5){refillEnemies();saveGame("stage-start")}updateUi()
+}
+function startRoom(index){
+  roomIndex=index;roomKills=0;roomCleared=false;bossFight=false;bossCheckpoint=false;enemies=[];projectiles=[];allies=[];player.x=45;player.y=player.baseY;player.vy=0;player.isJumping=false;player.hp=Math.min(player.maxHp,player.hp+Math.ceil(player.maxHp*.2));hazardLastHit=0;initAmbientParticles();
+  addAnimation("phase",roomName().toUpperCase());statusEl.textContent=`Místnost: ${roomName()}. Poraz ${roomTarget()} nepřátel.`;log(`Vstupuješ do místnosti: ${roomName()}.`);refillEnemies();saveGame("room-start");updateUi()
+}
+function markRoomCleared(){
+  if(roomCleared||bossFight)return;roomCleared=true;enemies=[];projectiles=[];addAnimation("unlock","CESTA OTEVŘENA");statusEl.textContent="Cesta je otevřená. Dojdi k bráně napravo a stiskni E.";log("Pečeť místnosti padla.");updateUi();
+}
+function advanceRoom(){
+  if(!roomCleared||bossFight||stageIndex===5)return;
+  if(roomIndex<1){startRoom(roomIndex+1)}else{bossCheckpoint=true;saveGame("boss-checkpoint",{bossCheckpoint:true});startBossFight()}
+}
+function startBossFight(){
+  bossFight=true;bossCheckpoint=true;saveGame("boss-checkpoint",{bossCheckpoint:true});
+  enemies=[];
+  projectiles=[];
+  allies=[];
+  const intro=BOSS_INTROS[stage().boss];
+  openCustomPanel(
+    intro?intro.title:"Boss Fight",
+    intro?intro.paragraphs:["Před tebou stojí další pán hradu."],
+    intro&&intro.button?intro.button:"Vstoupit do souboje",
+    ()=>{
+      let boss=createEnemy(stage().boss,player.x<450?690:120);
+      enemies=[boss];
+      addAnimation("boss",boss.name.toUpperCase());
+      if(boss.type==="hunterBoss") statusEl.textContent="Boss fight: Hunter. Lehčí první zkouška, ale pozor na dlouhý Marksman.";
+      else if(boss.type==="templarBoss") statusEl.textContent="Boss fight: Templar. Tanky souboj, neútoč do blademailu.";
+      else if(boss.type==="mageBoss") statusEl.textContent="Boss fight: Mage. Těžší než Hunter, drž pohyb a využívej plošiny.";
+      else if(boss.type==="assassinBoss") statusEl.textContent="Boss fight: Assassin. Hýbej se, jinak ambush bolí.";
+      else if(boss.type==="necromancerBoss") statusEl.textContent="Boss fight: Necromancer. Finální tlak lebek a summonů.";
+      else statusEl.textContent="Boss fight: "+boss.name+". Používej plošiny a spell na R.";
+      log("Boss fight: "+boss.name);
+      updateUi();
+    }
+  );
+}
+function spawnEnemy(){
+  if(gameOver||bossFight||playerDead||roomCleared||roomKills>=roomTarget())return;
+  if(enemies.filter(e=>e.hp>0).length>=maxRoomEnemies())return;
+  const pool=roomEnemyPool();if(!pool||!pool.length)return;
+  const type=pool[rand(0,pool.length-1)],x=player.x<450?rand(690,800):rand(60,170),e=createEnemy(type,x);enemies.push(e);log(`Objevil se ${e.name}${e.weaponStyle&&e.weaponStyle!=="default"?` [${e.weaponStyle}]`:""}.`)
+}
+function refillEnemies(){
+  if(bossFight||gameOver||playerDead||roomCleared||roomKills>=roomTarget())return;
+  const remaining=Math.max(0,roomTarget()-roomKills),max=Math.min(maxRoomEnemies(),remaining),missing=max-enemies.filter(e=>e.hp>0).length;
+  for(let i=0;i<missing;i++)setTimeout(()=>{if(!bossFight&&!gameOver&&!playerDead&&!roomCleared)spawnEnemy()},350+i*550)
+}
+function nearestEnemy(range=Infinity,includeInvisible=false){let best=null,bd=Infinity;enemies.forEach(e=>{if(e.hp<=0||e.invisible&&!includeInvisible)return;let d=distanceTo(e);if(d<=range&&d<bd){best=e;bd=d}});return best}
+function damageEnemy(e,amount,source="player"){
+  if(!e||e.hp<=0)return;
+  if(e.type==="originalHero"){
+    let th=Math.ceil(e.maxHp*.1);
+    if(e.hp-amount<=th){e.hp=th;triggerFinalSelfKill();return}
+  }
+  if(e.weaponStyle==="shield"&&source==="player"&&!e.isBoss){
+    const front=(e.facing===1&&playerCenterX()>enemyCenterX(e))||(e.facing===-1&&playerCenterX()<enemyCenterX(e));
+    if(front){amount=Math.max(1,Math.ceil(amount*.35));addFloat("BLOCK",e.x+e.w/2,e.y-16,"neutral")}
+  }
+  if(e.type==="templarBoss"&&Date.now()<e.thornUntil&&source==="player"){
+    let reflected=Math.max(1,Math.ceil(amount*.5));
+    addAnimation("small","BLADEMAIL");
+    addFloat("BLOCK",e.x+e.w/2,e.y-18,"neutral");
+    damagePlayer(reflected,"Templářův blademail odrazil útok.",e,true);
+    return;
+  }
+  let real=Math.min(amount,e.hp);
+  e.hp=Math.max(0,e.hp-amount);
+  addFloat("-"+real,e.x+e.w/2,e.y-14,source==="player"?"damage":"ally");
+  if(source==="player")applyLifesteal(real);
+  if(e.hp<=0)defeatEnemy(e)
+}
+function damagePlayer(amount,msg,sourceEnemy=null,reflected=false){
+  if(gameOver||playerDead)return;
+  if(player.invisible&&!reflected){log("Zásah tě minul, protože jsi v neviditelnosti.");return}
+  if(Date.now()<player.thornUntil&&sourceEnemy&&sourceEnemy.hp>0&&!reflected){
+    let reflectedBack=Math.max(1,Math.ceil(amount*.5));
+    addAnimation("small","THORNS");
+    addFloat("BLOCK",player.x+player.w/2,player.y-18,"neutral");
+    damageEnemy(sourceEnemy,reflectedBack,"reflect");
+    log("Templářův thorn armor zcela pohltil útok.");
+    updateUi();
+    return;
+  }
+  player.hp=Math.max(0,player.hp-amount);
+  addFloat("-"+amount,player.x+player.w/2,player.y-16,"taken");
+  log(msg+" -"+amount+" HP.");
+  if(player.hp<=0){
+    player.lives--;
+    if(player.lives>0&&stageIndex!==5)startRespawn();
+    else endGame(stageIndex===5?"Původní hrdina tě zničil jedním úderem.":"Došly ti životy.")
+  }
+  updateUi()
+}
+
+function applyLifesteal(d){if(d<=0||playerDead||gameOver)return;let h=Math.max(1,Math.floor(d*.2)),old=player.hp;player.hp=Math.min(player.maxHp,player.hp+h);let r=player.hp-old;if(r>0)addFloat("+"+r,player.x+player.w/2,player.y-12,"heal")}
+function defeatEnemy(e){
+  enemies=enemies.filter(x=>x.id!==e.id);
+  if(e.isBoss){handleBossDefeat(e);return}
+  stageScore+=SCORE_PER_ENEMY;roomKills++;log(`${e.name} poražen. Postup ${roomKills}/${roomTarget()}.`);
+  if(roomKills>=roomTarget()){
+    if(enemies.length===0)markRoomCleared()
+  }else refillEnemies();
+  updateUi()
+}
+
+function setStoryPanel(title, paragraphs, buttonText){
+  if(storyTitleEl) storyTitleEl.textContent=title;
+  if(storyContentEl) storyContentEl.innerHTML=paragraphs.map(p=>`<p>${p}</p>`).join("");
+  if(startStoryBtn) startStoryBtn.textContent=buttonText||"Pokračovat";
+}
+function openCustomPanel(title, paragraphs, buttonText, onContinue){
+  storyOpen=true;
+  pendingStoryAction=onContinue||null;
+  if(introOverlay) introOverlay.style.display="flex";
+  setStoryPanel(title, paragraphs, buttonText);
+}
+function openStoryPanel(key, onContinue){
+  const panel=STORY_PANELS[key];
+  if(!panel) return;
+  openCustomPanel(panel.title,panel.paragraphs,panel.button,onContinue);
+}
+function closeStoryPanel(){
+  const action=pendingStoryAction;
+  pendingStoryAction=null;
+  introOpen=false;
+  storyOpen=false;
+  if(introOverlay) introOverlay.style.display="none";
+  if(action) action();
+}
+function setupIntroStory(){
+  introOpen=true;
+  storyOpen=false;
+  pendingStoryAction=null;
+  const panel=STORY_PANELS.intro;
+  if(introOverlay) introOverlay.style.display="flex";
+  setStoryPanel(panel.title,panel.paragraphs,panel.button);
+}
+function enterFinalMirrorStage(){
+  stageIndex=5;
+  stageScore=0;
+  bossFight=true;
+  enemies=[];
+  projectiles=[];
+  allies=[];
+  applyForm("necromancer",true);
+  player.x=90;
+  player.y=player.baseY;
+  enemies.push(createEnemy("originalHero",690));
+  statusEl.textContent="Hraješ jako Necromancer. Proti tobě stojí tvoje původní podoba.";
+  log("Poslední fight: proti tvému původnímu já. Nepůjde ho skutečně zabít.");
+  saveGame("final-mirror",{stageIndex:5,finalMirror:true,bossCheckpoint:true});updateUi();
+}
+function handleBossDefeat(e){
+  bossCheckpoint=false;log(e.name+" poražen.");
+  if(e.type==="hunterBoss"){
+    addAnimation("phase","DUŠE LOVCE");
+    openStoryPanel("hunter",()=>startStage(stageIndex+1));
+    return;
+  }
+  if(e.type==="templarBoss"){
+    addAnimation("phase","PŘÍSAHA V KRVI");
+    openStoryPanel("templar",()=>startStage(stageIndex+1));
+    return;
+  }
+  if(e.type==="mageBoss"){
+    addAnimation("phase","MODRÝ PLAMEN");
+    openStoryPanel("mage",()=>startStage(stageIndex+1));
+    return;
+  }
+  if(e.type==="assassinBoss"){
+    addAnimation("phase","MASKA STÍNU");
+    openStoryPanel("assassin",()=>startStage(stageIndex+1));
+    return;
+  }
+  if(e.type==="necromancerBoss"){
+    addAnimation("phase","KRÁL MRTVÝCH");
+    openStoryPanel("necromancer",()=>enterFinalMirrorStage());
+    return;
+  }
+}
+function triggerFinalSelfKill(){if(finalTriggered)return;finalTriggered=true;projectiles=[];addAnimation("boss","TVÁ PRVNÍ DUŠE");log("Původní Lifestealer je na 10 % HP. Nedá se zabít.");log("Nemůžeš ukrást vlastní duši.");setTimeout(()=>{if(!gameOver){player.hp=0;updateUi();endGame("Vlastní duši nelze ukrást.");setTimeout(()=>openStoryPanel("final",null),250)}},900)}
+function startRespawn(){playerDead=true;respawnAt=Date.now()+5000;projectiles=[];player.hp=0;addAnimation("small","RESPAWN 5s");statusEl.textContent="Padl jsi. Respawn za 5 sekund.";log("Respawn za 5 sekund. Zbývá životů: "+player.lives+".")}
+function respawnPlayer(){playerDead=false;respawnAt=0;player.hp=player.maxHp;player.x=90;player.y=player.baseY;player.vy=0;player.isJumping=false;player.invisible=false;player.ambushReadyUntil=0;player.thornUntil=0;projectiles=[];allies=[];log("Respawn hotový.")}
+function endGame(msg){gameOver=true;playerDead=false;statusEl.textContent=msg;addAnimation("boss","KONEC");log(msg);updateUi()}
+function playerAttack(){if(gameOver||playerDead)return;let now=Date.now(),f=formDef();if(now-player.lastAttack<f.cooldown){statusEl.textContent="Útok se ještě obnovuje.";return}let target=nearestEnemy(f.range);if(!target){statusEl.textContent="Nemáš v dosahu viditelný cíl.";return}player.facing=enemyCenterX(target)<playerCenterX()?-1:1;player.lastAttack=now;let dmg=f.damage;if(player.form==="assassin"){if(now<player.ambushReadyUntil){dmg=Math.ceil(dmg*4);player.ambushReadyUntil=0;player.invisible=false;addAnimation("crit","AMBUSH")}else if(rollDie(20)>=15){dmg=Math.ceil(dmg*2.2);addAnimation("crit","CRIT")}}if(["hunter","mage","necromancer"].includes(player.form)){
+  const dx=enemyCenterX(target)-playerCenterX();
+  const dy=(target.y+target.h/2)-(player.y+player.h/2);
+  const len=Math.sqrt(dx*dx+dy*dy)||1;
+  const speed=player.form==="mage"?6.1:5.6;
+  projectiles.push({
+    id:nextProjectileId++,
+    type:player.form==="hunter"?"playerArrow":player.form==="necromancer"?"playerSkull":"playerMagic",
+    owner:"player",
+    x:player.x+player.w/2,
+    y:player.y+30,
+    vx:dx/len*speed,
+    vy:dy/len*speed,
+    r:player.form==="mage"?7:6,
+    damage:dmg,
+    speed,
+    targetId:target.id,
+    homingUntil:player.form==="mage"?now+900:0,
+    expiresAt:player.form==="mage"?now+2600:now+1700
+  });
+  statusEl.textContent=player.form==="mage"?"Mage vystřelil přes celou mapu.":player.form==="necromancer"?"Necromancer vypustil silnou lebku.":formDef().label+" zaútočil na dálku.";
+}else damageEnemy(target,dmg,"player");updateUi()}
+function useSpell(){if(gameOver||playerDead)return;let now=Date.now(),f=player.form;if(f==="hero"){statusEl.textContent="Lifestealer na začátku ještě žádný spell nemá.";return}if(spellCooldowns[f]&&now<spellCooldowns[f]){statusEl.textContent="Spell cooldown: "+Math.ceil((spellCooldowns[f]-now)/1000)+" s.";return}if(f==="hunter"){let t=nearestEnemy(430);if(!t){statusEl.textContent="Marksman nemá cíl.";return}if(distanceTo(t)<110){statusEl.textContent="Marksman nejde zblízka.";return}playerCharging={type:"marksman",targetId:t.id,fireAt:now+1500};spellCooldowns.hunter=now+6000;addAnimation("unlock","MARKSMAN AIM");return}if(f==="templar"){player.thornUntil=now+3000;spellCooldowns.templar=7000+now;addAnimation("unlock","THORN ARMOR");return}if(f==="mage"){
+  const targets=enemies.filter(e=>e.hp>0&&!e.invisible&&distanceTo(e)<=230);
+  if(!targets.length){
+    statusEl.textContent="Knockback nemá cíl v blízkosti.";
+    return;
+  }
+  targets.forEach(t=>{
+    const dir=enemyCenterX(t)<playerCenterX()? -1 : 1;
+    t.x+=dir*185;
+    t.x=Math.max(0,Math.min(canvas.width-t.w,t.x));
+    damageEnemy(t,t.isBoss?3:5,"player");
+    addFloat("ODHOZENÍ",t.x+t.w/2,t.y-28,"neutral");
+  });
+  spellCooldowns.mage=now+5500;
+  addAnimation("unlock","KNOCKBACK");
+  statusEl.textContent="Mage odhodil nepřátele okolo sebe.";
+  return;
+}if(f==="assassin"){player.invisible=true;player.ambushReadyUntil=now+4000;activeSpellUntil=now+1500;spellCooldowns.assassin=now+6500;addAnimation("unlock","VANISH");return}if(f==="necromancer"){if(allies.length>=5)return;allies.push({id:"a"+now,x:Math.max(20,Math.min(canvas.width-50,player.x+(player.facing===1?55:-35))),y:groundY-58,w:34,h:58,hp:7,damage:3,speed:1.2,lastAttack:0,expiresAt:now+7000});spellCooldowns.necromancer=now+3500;addAnimation("unlock","SUMMON")}}
+function updateCharging(){if(!playerCharging)return;let now=Date.now();if(playerCharging.type==="marksman"){let t=enemies.find(e=>e.id===playerCharging.targetId&&e.hp>0);if(!t){playerCharging=null;return}if(distanceTo(t)<110){addAnimation("small","MARKSMAN CANCEL");playerCharging=null;return}if(now>=playerCharging.fireAt){projectiles.push({id:nextProjectileId++,type:"marksman",owner:"player",x:player.x+player.w/2,y:player.y+30,vx:t.x>player.x?8:-8,vy:0,r:7,damage:t.isBoss?14:999,targetId:t.id,expiresAt:now+1300});addAnimation("crit","MARKSMAN");playerCharging=null}}}
+function updatePlayer(){if(gameOver||playerDead)return;let moved=false;if(keys.left){player.x-=player.speed;player.facing=-1;moved=true}if(keys.right){player.x+=player.speed;player.facing=1;moved=true}if(moved)playerLastMoveTime=Date.now();clampPlayerX();if(player.isJumping||player.y<player.baseY){let prev=player.y+player.h;player.vy+=.45;player.y+=player.vy;let landed=false;if(player.vy>=0){for(let pl of currentPlatforms()){if(player.x+player.w>pl.x&&player.x<pl.x+pl.w&&prev<=pl.y&&player.y+player.h>=pl.y){player.y=pl.y-player.h;player.vy=0;player.isJumping=false;landed=true;break}}}if(!landed&&player.y>=player.baseY){player.y=player.baseY;player.vy=0;player.isJumping=false}}if(player.invisible&&Date.now()>activeSpellUntil&&Date.now()>player.ambushReadyUntil)player.invisible=false;if(roomCleared&&!bossFight&&player.x>canvas.width-player.w-24)advanceRoom()}
+function jumpPlayer(){if(gameOver||playerDead||player.isJumping)return;player.vy=-10.7;player.isJumping=true;playerLastMoveTime=Date.now()}
+function updateEnemies(){if(gameOver||playerDead)return;let now=Date.now();enemies=enemies.filter(e=>!(e.type==="skeleton"&&e.expiresAt&&now>e.expiresAt)&&e.hp>0);enemies.forEach(e=>{if(["bandit","warrior","skeleton"].includes(e.type))updateMelee(e,now);if(e.type==="archer")updateArcher(e,now);if(e.type==="chapelMage")updateChapelMage(e,now);if(e.type==="assassinMinion")updateAssassinMinion(e,now);if(e.type==="hunterBoss")updateHunterBoss(e,now);if(e.type==="templarBoss")updateTemplarBoss(e,now);if(e.type==="mageBoss")updateMageBoss(e,now);if(e.type==="assassinBoss")updateAssassinBoss(e,now);if(e.type==="necromancerBoss")updateNecromancerBoss(e,now);if(e.type==="originalHero")updateOriginalHero(e,now);e.x=Math.max(0,Math.min(canvas.width-e.w,e.x))});if(!bossFight&&enemies.filter(e=>e.hp>0).length===0){if(roomKills>=roomTarget())markRoomCleared();else refillEnemies()}}
+function updateMelee(e,now){
+  const d=distanceTo(e);e.facing=enemyCenterX(e)<playerCenterX()?1:-1;
+  const style=e.weaponStyle||"sword";
+  const range=style==="greatsword"?92:style==="hammer"?78:70;
+  const speedFactor=style==="shield"?.72:style==="greatsword"?.68:style==="hammer"?.78:style==="axe"?.86:1;
+  if(d>range-8)e.x+=enemyCenterX(e)<playerCenterX()?e.speed*speedFactor:-e.speed*speedFactor;
+  let cd=e.cooldown+(style==="greatsword"?650:style==="hammer"?450:style==="axe"?250:style==="shield"?250:0);
+  let dmg=e.damage+(style==="greatsword"?2:style==="axe"?1:style==="hammer"?1:0);
+  if(d<=range&&now-e.lastAttack>cd){
+    e.lastAttack=now;damagePlayer(dmg,`${e.name} (${style}) tě zasáhl.`,e);
+    if(style==="hammer"&&!playerDead){player.x+=e.facing*95;clampPlayerX();player.vy=-4.5;player.isJumping=true;addAnimation("small","ODHOZENÍ")}
+  }
+}
+function updateArcher(e,now){
+  const d=distanceTo(e);e.facing=enemyCenterX(e)<playerCenterX()?1:-1;
+  const longbow=e.weaponStyle==="longbow";
+  if(d<(longbow?220:180))e.x+=enemyCenterX(e)<playerCenterX()?-e.speed:e.speed;
+  if(d>(longbow?390:310))e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;
+  const cd=e.cooldown+(longbow?550:0),damage=Math.ceil(player.maxHp*(longbow?.28:.2));
+  if(now-e.lastShot>cd){e.lastShot=now;shootArrow(e,false,damage)}
+}
+function updateChapelMage(e,now){let d=distanceTo(e);if(d<170)e.x+=enemyCenterX(e)<playerCenterX()?-e.speed:e.speed;if(d>320)e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;if(now-e.lastShot>e.cooldown){e.lastShot=now;shootHoming(e,"homing",e.damage,1.55,1000,2000)}}
+function updateAssassinMinion(e,now){
+  const d=distanceTo(e),style=e.weaponStyle||"daggers";e.facing=enemyCenterX(e)<playerCenterX()?1:-1;
+  const speed=style==="shadow"?e.speed*1.35:e.speed;
+  if(d>58)e.x+=enemyCenterX(e)<playerCenterX()?speed:-speed;
+  if(d<=65&&now-e.lastAttack>e.cooldown){
+    e.lastAttack=now;damagePlayer(e.damage+(style==="daggers"?1:0),`Stín (${style}) tě bodl.`,e);
+    if(style==="poison")setTimeout(()=>{if(!gameOver&&!playerDead)damagePlayer(1,"Jed dál působí.")},700)
+  }
+}
+function updateHunterBoss(e,now){let d=distanceTo(e);if(e.aimingUntil&&now<e.aimingUntil){if(d<110){e.aimingUntil=0;e.marksmanReadyAt=now+9500;addAnimation("small","MARKSMAN CANCEL")}return}if(e.aimingUntil&&now>=e.aimingUntil){e.aimingUntil=0;e.marksmanReadyAt=now+12500;shootArrow(e,true,"oneshot");addAnimation("crit","MARKSMAN");return}if(now>e.marksmanReadyAt&&d>150){e.aimingUntil=now+2400;addAnimation("unlock","HUNTER AIM");return}if(d<155){if(now-e.lastAttack>1450){e.lastAttack=now;damagePlayer(1,"Hunter tě praštil zblízka.",e)}}else if(now-e.lastShot>e.cooldown){e.lastShot=now;shootArrow(e,false,Math.ceil(player.maxHp*.25))}}
+function updateTemplarBoss(e,now){let d=distanceTo(e);if(now>e.nextThornAt){e.thornUntil=now+2600;e.nextThornAt=now+11500;addAnimation("unlock","BLADEMAIL")}if(d>75)e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;if(d<=82&&now-e.lastAttack>e.cooldown){e.lastAttack=now;damagePlayer(e.damage,"Templar Boss tě zasáhl mečem.",e)}}
+function knockbackPlayerFrom(e){let dir=playerCenterX()<enemyCenterX(e)?-1:1;player.x+=dir*170;clampPlayerX();player.vy=-8.2;player.isJumping=true;addAnimation("small","KNOCKBACK")}
+function updateMageBoss(e,now){let d=distanceTo(e);if(d<125){if(!e.closeStart)e.closeStart=now;if(now-e.closeStart>3000){e.closeStart=now;e.lastShot=now;knockbackPlayerFrom(e)}return}e.closeStart=0;if(d<190)e.x+=enemyCenterX(e)<playerCenterX()?-e.speed:e.speed;if(d>330)e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;if(now-e.lastShot>e.cooldown){e.lastShot=now;shootHoming(e,"homing",e.damage,1.85,1400,2300)}}
+function updateAssassinBoss(e,now){let d=distanceTo(e);if(!e.vanishUntil&&now-e.lastSpell>7600){e.lastSpell=now;e.vanishUntil=now+1400;e.invisible=true;addAnimation("unlock","VANISH");return}if(e.vanishUntil&&now>=e.vanishUntil){e.vanishUntil=0;e.invisible=false;e.x=Math.max(30,Math.min(canvas.width-e.w-30,player.x+(Math.random()<.5?-75:75)));if(Date.now()-playerLastMoveTime>900){damagePlayer(Math.ceil(player.maxHp*.62),"Assassin Boss zasadil ambush crit.",e);addAnimation("crit","AMBUSH")}else addAnimation("small","AMBUSH MISS");return}if(e.invisible)return;if(d>60)e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;if(d<=68&&now-e.lastAttack>e.cooldown){e.lastAttack=now;damagePlayer(e.damage,"Assassin Boss tě sekl.",e)}}
+function updateNecromancerBoss(e,now){let d=distanceTo(e);if(d<200)e.x+=enemyCenterX(e)<playerCenterX()?-e.speed:e.speed;if(d>360)e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;if(now-e.lastShot>1650){e.lastShot=now;shootHoming(e,"skull",Math.ceil(player.maxHp*.28),1.85,1200,2200)}if(enemies.filter(x=>x.type==="skeleton").length<5&&now-e.lastSummon>1650){e.lastSummon=now;enemies.push(createEnemy("skeleton",Math.max(30,Math.min(canvas.width-60,e.x+(Math.random()<.5?-85:85))))) }}
+function updateOriginalHero(e,now){let d=distanceTo(e);if(d>65)e.x+=enemyCenterX(e)<playerCenterX()?e.speed:-e.speed;if(d<=75&&now-e.lastAttack>e.cooldown){e.lastAttack=now;damagePlayer(e.damage,"Původní hrdina tě zasáhl obyčejným útokem.",e)}}
+function shootArrow(e,marksman,damage){let sx=e.x+e.w/2,sy=e.y+32,tx=player.x+player.w/2,ty=player.y+32,dx=tx-sx,dy=ty-sy,l=Math.sqrt(dx*dx+dy*dy)||1,s=marksman?6.6:4.6;projectiles.push({id:nextProjectileId++,type:marksman?"marksmanEnemy":"arrow",owner:"enemy",x:sx,y:sy,vx:dx/l*s,vy:dy/l*s,r:marksman?7:6,damage,oneshot:marksman,expiresAt:Date.now()+2500})}
+function shootHoming(e,type,damage,speed,homingMs,expireMs){let sx=e.x+e.w/2,sy=e.y+28,tx=player.x+player.w/2,ty=player.y+34,dx=tx-sx,dy=ty-sy,l=Math.sqrt(dx*dx+dy*dy)||1,now=Date.now();projectiles.push({id:nextProjectileId++,type,owner:"enemy",x:sx,y:sy,vx:dx/l*speed,vy:dy/l*speed,r:type==="skull"?9:8,damage,speed,homingUntil:now+homingMs,expiresAt:now+expireMs})}
+function updateProjectiles(){if(playerDead)return;let now=Date.now(),kept=[];for(let p of projectiles){if(p.expiresAt&&now>p.expiresAt)continue;if(p.owner==="player"&&p.homingUntil&&now<p.homingUntil){let t=enemies.find(e=>e.id===p.targetId&&e.hp>0&&!e.invisible);if(t){let dx=t.x+t.w/2-p.x,dy=t.y+t.h/2-p.y,l=Math.sqrt(dx*dx+dy*dy)||1;p.vx=dx/l*p.speed;p.vy=dy/l*p.speed}}if(p.owner==="enemy"&&(p.type==="homing"||p.type==="skull")&&now<p.homingUntil){let dx=player.x+player.w/2-p.x,dy=player.y+player.h/2-p.y,l=Math.sqrt(dx*dx+dy*dy)||1;p.vx=dx/l*p.speed;p.vy=dy/l*p.speed}p.x+=p.vx;p.y+=p.vy;if(p.owner==="enemy"&&platformBlocksProjectile(p)){addFloat("BLOCK",p.x,p.y);continue}if(p.owner==="enemy"){let hit=p.x+p.r>player.x&&p.x-p.r<player.x+player.w&&p.y+p.r>player.y&&p.y-p.r<player.y+player.h;if(hit){if(p.oneshot||p.damage==="oneshot")damagePlayer(player.maxHp,"Marksman šíp tě oneshotnul.");else damagePlayer(p.damage,p.type==="skull"?"Lebka tě zasáhla.":"Projektil tě zasáhl.");continue}}if(p.owner==="player"){let t=enemies.find(e=>e.hp>0&&!e.invisible&&p.x+p.r>e.x&&p.x-p.r<e.x+e.w&&p.y+p.r>e.y&&p.y-p.r<e.y+e.h);if(t){damageEnemy(t,p.damage,"player");continue}}if(p.x>-80&&p.x<canvas.width+80&&p.y>-80&&p.y<canvas.height+80)kept.push(p)}projectiles=kept}
+function updateAllies(){let now=Date.now();allies=allies.filter(a=>now<a.expiresAt&&a.hp>0);allies.forEach(a=>{let t=nearestEnemy(500,true);if(!t)return;let d=Math.abs(a.x+a.w/2-(t.x+t.w/2));if(d>55)a.x+=a.x<t.x?a.speed:-a.speed;else if(now-a.lastAttack>900){a.lastAttack=now;damageEnemy(t,a.damage,"ally")}})}
+function updateHazard(){
+  if(menuOpen||introOpen||storyOpen||bossFight||playerDead||roomCleared)return;
+  const r=currentRoom();if(!r||!r.hazard)return;
+  const zones={bog:[340,535,1,1700],spikes:[385,520,2,1350],rune:[345,545,2,1600],shadow:[315,580,1,1450],necrotic:[365,550,2,1250]};
+  const z=zones[r.hazard];if(!z)return;
+  const grounded=player.y>=player.baseY-2,inside=player.x+player.w>z[0]&&player.x<z[1];
+  if(grounded&&inside&&Date.now()-hazardLastHit>z[3]){
+    hazardLastHit=Date.now();damagePlayer(z[2],`${r.name}: prostředí tě zraňuje.`);
+    if(r.hazard==="rune"&&!playerDead){player.x+=player.x<445?-80:80;clampPlayerX();player.vy=-5;player.isJumping=true}
+  }
+}
+function updateAmbientParticles(){
+  ambientParticles.forEach(p=>{p.y-=p.s;p.x+=Math.sin(Date.now()/900+p.phase)*.15;if(p.y<-5){p.y=canvas.height+5;p.x=Math.random()*canvas.width}})
+}
+function updateGame(){if(menuOpen||introOpen||storyOpen)return;if(playerDead&&Date.now()>=respawnAt)respawnPlayer();updateHazard();updateAmbientParticles();updateCharging();updatePlayer();updateEnemies();updateAllies();updateProjectiles();updateAnimations();updateUi()}
+function updateAnimations(){animations.forEach(a=>a.timer--);animations=animations.filter(a=>a.timer>0)}
+function skipLevel(){
+  if(gameOver)return;if(playerDead){playerDead=false;respawnAt=0;player.hp=player.maxHp}
+  if(!bossFight){if(!roomCleared){roomKills=roomTarget();enemies=[];markRoomCleared()}else advanceRoom();return}
+  const b=enemies.find(e=>e.isBoss);if(b)damageEnemy(b,b.hp,"player")
+}
+function restart(){showMainMenu()}
+function updateUi(){
+  formStatusEl.textContent=formDef().label;stageStatusEl.textContent=bossFight?`${stage().title} — boss`:`${stage().title} — ${roomName()}`;hpStatusEl.textContent=player.hp+" / "+player.maxHp;lifeStatusEl.textContent=player.lives+" / "+player.maxLives;
+  const now=Date.now(),cd=spellCooldowns[player.form]&&now<spellCooldowns[player.form]?" ("+Math.ceil((spellCooldowns[player.form]-now)/1000)+"s)":"";spellStatusEl.textContent=formDef().spellName+cd;
+  const b=enemies.find(e=>e.isBoss);bossStatusEl.textContent=b?b.name+" "+b.hp+"/"+b.maxHp:"-";scoreStatusEl.textContent=bossFight?"BOSS":roomCleared?"otevřeno":`${roomKills} / ${roomTarget()}`;
+  if(roomBanner)roomBanner.textContent=bossFight?`BOSS — ${stage().title}`:`${stage().title} • ${roomName()} • ${roomKills}/${roomTarget()}`;
+}
+function drawBackground(){
+  let env=stage().env;
+  if(env==="outside"){
+    ctx.fillStyle="#93b49c";ctx.fillRect(0,0,900,430);
+    ctx.fillStyle="#b8d3c0";ctx.fillRect(0,0,900,125);
+    ctx.fillStyle="#a7c5bc";ctx.fillRect(70,36,110,40);ctx.fillRect(150,22,80,28);ctx.fillRect(700,24,120,46);
+    ctx.fillStyle="#8aa5a2";ctx.fillRect(10,76,140,16);ctx.fillRect(138,72,160,18);ctx.fillRect(650,88,180,18);
+    ctx.fillStyle="#6c8a87";ctx.fillRect(0,118,900,24);
+    ctx.fillStyle="#4a6961";ctx.fillRect(0,250,900,82);
+    ctx.fillStyle="#335047";ctx.fillRect(180,174,260,30);ctx.fillRect(200,154,220,22);ctx.fillRect(520,184,170,24);
+    ctx.fillStyle="#28453d";ctx.fillRect(170,202,275,44);ctx.fillRect(525,208,185,40);
+    ctx.fillStyle="#46343f";ctx.fillRect(258,125,132,78);ctx.fillRect(292,104,28,101);ctx.fillRect(349,92,24,111);ctx.fillRect(375,111,18,94);
+    ctx.fillStyle="#5b4551";ctx.fillRect(275,110,20,15);ctx.fillRect(305,91,16,13);ctx.fillRect(355,80,14,12);
+    ctx.fillStyle="#2a1f28";ctx.fillRect(305,165,26,38);
+    ctx.fillStyle="#c6ab7a";ctx.fillRect(314,171,8,32);
+    for(let i=0;i<6;i++){ctx.fillStyle=i%2?"#315247":"#406458";ctx.fillRect(535+i*24,145-(i%2)*8,18,60+i*4)}
+    ctx.fillStyle="#597a55";ctx.fillRect(0,282,900,48);
+    ctx.fillStyle="#314945";ctx.fillRect(0,330,900,44);
+    ctx.fillStyle="#47655e";for(let i=0;i<10;i++)ctx.fillRect(i*95,332+(i%2)*6,72,2);
+  }else if(env==="gate"){
+    ctx.fillStyle="#2d2b35";ctx.fillRect(0,0,900,430);
+    ctx.fillStyle="#3f4654";ctx.fillRect(0,0,900,110);
+    ctx.fillStyle="#5e6f74";ctx.fillRect(0,95,900,18);
+    ctx.fillStyle="#4f4856";ctx.fillRect(0,110,900,172);
+    for(let i=0;i<18;i++){ctx.fillStyle=i%2?"#5c5664":"#504957";ctx.fillRect(i*50,112,28,170)}
+    ctx.fillStyle="#332f39";ctx.fillRect(322,128,255,154);
+    ctx.fillStyle="#8d7751";ctx.fillRect(362,176,174,106);
+    ctx.fillStyle="#ab936b";for(let i=0;i<8;i++)ctx.fillRect(374+i*20,176,10,106);
+    ctx.fillStyle="#c7b38a";ctx.fillRect(357,170,184,8);
+    ctx.fillStyle="#7d3230";ctx.fillRect(240,126,28,92);ctx.fillRect(636,126,28,92);
+    ctx.fillStyle="#e6bf59";ctx.fillRect(247,148,13,15);ctx.fillRect(643,148,13,15);
+    ctx.fillStyle="#3a333f";ctx.fillRect(0,282,900,92);
+  }else if(env==="chapel"){
+    ctx.fillStyle="#222237";ctx.fillRect(0,0,900,430);
+    ctx.fillStyle="#37314d";ctx.fillRect(0,0,900,130);
+    ctx.fillStyle="#1b1730";ctx.fillRect(0,130,900,170);
+    for(let i=0;i<5;i++){
+      let x=110+i*145;
+      ctx.fillStyle=i%2?"#5e8fcb":"#8f6ac4";ctx.fillRect(x,62,34,104);
+      ctx.fillStyle="#15111f";ctx.fillRect(x+12,70,9,88);
+      ctx.fillStyle="#9edcff";ctx.fillRect(x+3,66,7,96);
+      ctx.fillStyle="#cf9cff";ctx.fillRect(x+24,66,7,96);
+    }
+    ctx.fillStyle="#c8a55e";ctx.fillRect(430,98,40,78);
+    ctx.fillStyle="#eedaa7";ctx.fillRect(446,108,8,58);
+    ctx.fillStyle="#5b5367";for(let i=0;i<9;i++)ctx.fillRect(i*100,302,56,16);
+    ctx.fillStyle="#302838";ctx.fillRect(0,318,900,56);
+  }else if(env==="dungeon"){
+    ctx.fillStyle="#16121a";ctx.fillRect(0,0,900,430);
+    ctx.fillStyle="#231d2b";ctx.fillRect(0,0,900,120);
+    ctx.fillStyle="#2f2737";ctx.fillRect(0,120,900,180);
+    for(let i=0;i<13;i++){ctx.fillStyle=i%2?"#352c3d":"#28212f";ctx.fillRect(i*70,120,34,178)}
+    for(let i=0;i<4;i++){
+      const x=130+i*190;
+      ctx.fillStyle="#6f4f2c";ctx.fillRect(x,116,14,62);
+      ctx.fillStyle="#cf9245";ctx.fillRect(x-5,106,24,12);
+      ctx.fillStyle="#ffd37e";ctx.fillRect(x+1,96,12,10);
+    }
+    ctx.fillStyle="#5b4a54";for(let i=0;i<8;i++)ctx.fillRect(i*112,300,60,16);
+    ctx.fillStyle="#221c27";ctx.fillRect(0,316,900,58);
+  }else{
+    ctx.fillStyle=env==="mirror"?"#0f0b14":"#1a1023";ctx.fillRect(0,0,900,430);
+    ctx.fillStyle="#34293f";ctx.fillRect(0,0,900,120);
+    ctx.fillStyle="#443553";ctx.fillRect(0,188,900,120);
+    ctx.fillStyle="#4f3c61";ctx.fillRect(302,188,296,56);
+    ctx.fillStyle="#6f4a9c";ctx.fillRect(410,95,82,115);
+    ctx.fillStyle="#d4ab52";ctx.fillRect(431,119,40,18);
+    ctx.fillStyle="#6d2f40";ctx.fillRect(392,92,18,140);ctx.fillRect(492,92,18,140);
+    ctx.fillStyle="#574465";for(let i=0;i<16;i++)ctx.fillRect(i*55,300,28,16);
+    ctx.fillStyle="#24182a";ctx.fillRect(0,316,900,58);
+  }
+  ctx.fillStyle=env==="outside"?"#2d463d":"#3b3342";ctx.fillRect(0,groundY-4,900,32);
+  for(let i=0;i<18;i++){ctx.fillStyle=i%2?"#4d4437":"#40382d";ctx.fillRect(i*50,groundY+6,26,20)}
+  ctx.fillStyle="#2e281f";ctx.fillRect(0,groundY+28,900,100)
+}
+function drawPlatforms(){
+  currentPlatforms().forEach(pl=>{
+    const outside=stage().env==="outside";
+    ctx.fillStyle=outside?"#7b5830":"#62596f";ctx.fillRect(pl.x,pl.y,pl.w,pl.h);
+    ctx.fillStyle=outside?"#a67b46":"#9287a0";ctx.fillRect(pl.x,pl.y-6,pl.w,6);
+    for(let i=0;i<Math.floor(pl.w/18);i++){
+      ctx.fillStyle=outside?(i%2?"#91663a":"#835a34"):(i%2?"#746985":"#695f78");
+      ctx.fillRect(pl.x+4+i*18,pl.y+3,12,5);
+    }
+    for(let i=0;i<Math.floor(pl.w/24);i++){
+      ctx.fillStyle=outside?"#5b4026":"#4b4458";
+      ctx.fillRect(pl.x+8+i*24,pl.y+10,16,3);
+    }
+    ctx.fillStyle="#352b2a";ctx.fillRect(pl.x+22,pl.y+pl.h,10,38);ctx.fillRect(pl.x+pl.w-32,pl.y+pl.h,10,38);
+    ctx.fillStyle=outside?"#4d3520":"#3f394b";ctx.fillRect(pl.x+24,pl.y+pl.h+10,6,24);ctx.fillRect(pl.x+pl.w-30,pl.y+pl.h+10,6,24);
+  })
+}
+function drawHpBar(x,y,w,h,pct,color){ctx.fillStyle="#111";ctx.fillRect(x,y,w,h);ctx.fillStyle=color;ctx.fillRect(x,y,Math.max(0,Math.min(w,w*pct)),h);ctx.strokeStyle="#e8d9b5";ctx.strokeRect(x,y,w,h)}
+
+function drawHeldWeapon(x,y,form,facing){
+  ctx.save();
+
+  function sword(){
+    ctx.fillStyle="#6f5137";
+    ctx.fillRect(x+35,y+31,5,10);
+    ctx.fillStyle="#eef1f5";
+    ctx.fillRect(x+40,y+32,34,7);
+    ctx.fillRect(x+74,y+34,7,3);
+  }
+
+  function bow(){
+    ctx.fillStyle="#684826";
+    ctx.fillRect(x+56,y+15,4,44);
+    ctx.fillRect(x+60,y+22,5,5);
+    ctx.fillRect(x+65,y+31,3,5);
+    ctx.fillRect(x+65,y+43,3,5);
+    ctx.fillRect(x+60,y+53,5,5);
+    ctx.fillStyle="#f1eadc";
+    ctx.fillRect(x+57,y+18,1,38);
+    ctx.fillStyle="#d7c39b";
+    ctx.fillRect(x+60,y+35,34,3);
+    ctx.fillRect(x+94,y+34,6,5);
+  }
+
+  function staff(color="#6fe5ff"){
+    ctx.fillStyle="#755638";
+    ctx.fillRect(x+57,y+8,5,58);
+    ctx.fillStyle=color;
+    ctx.fillRect(x+51,y-2,17,17);
+    ctx.fillStyle="#dcfbff";
+    ctx.fillRect(x+56,y+3,7,7);
+  }
+
+  function daggers(){
+    ctx.fillStyle="#e8ebf2";
+    ctx.fillRect(x+36,y+33,26,4);
+    ctx.fillStyle="#70523a";
+    ctx.fillRect(x+33,y+31,4,9);
+  }
+
+  if(form==="hero") sword();
+  if(form==="templar") sword();
+  if(form==="hunter") bow();
+  if(form==="mage") staff("#6fe5ff");
+  if(form==="assassin") daggers();
+  if(form==="necromancer") staff("#eee4bc");
+
+  ctx.restore();
+}
+
+function drawShadow(x,y,w,scale=1){
+  ctx.fillStyle="rgba(0,0,0,.22)";
+  ctx.fillRect(x+6,y+w*0+58*scale,w-8,6);
+}
+function drawPlayer(){
+  if(playerDead){
+    ctx.fillStyle="rgba(220,220,220,.55)";
+    ctx.fillRect(player.x+8,player.baseY+48,28,8);
+    return;
+  }
+
+  drawShadow(player.x,player.y,42,1);
+
+  ctx.save();
+  if(player.invisible) ctx.globalAlpha=.35;
+
+  if(player.facing<0){
+    // Draw the whole player as one group and mirror it.
+    // This guarantees body + weapon turn together.
+    ctx.translate(player.x+42,0);
+    ctx.scale(-1,1);
+    drawSprite(player.form,0,player.y,false,Date.now()<player.thornUntil,1);
+    drawHeldWeapon(0,player.y,player.form,1);
+  }else{
+    drawSprite(player.form,player.x,player.y,false,Date.now()<player.thornUntil,1);
+    drawHeldWeapon(player.x,player.y,player.form,1);
+  }
+
+  ctx.restore();
+
+  drawHpBar(player.x-5,player.y-18,54,8,player.hp/player.maxHp,"#3cb34a");
+  if(playerCharging){
+    ctx.fillStyle="#ff9f2d";
+    ctx.fillRect(player.x-5,player.y-30,54,6);
+  }
+}
+
+function drawEnemy(e){
+  drawShadow(e.x,e.y,e.w||42,1);
+  if(e.isBoss){
+    ctx.fillStyle="rgba(255,205,120,.14)";
+    ctx.fillRect(e.x-8,e.y-6,(e.w||48)+16,(e.h||72)+16);
+  }
+  if(e.invisible)ctx.globalAlpha=.22;
+  drawEnemySprite(e);
+  ctx.globalAlpha=1;
+  drawHpBar(e.x-6,e.y-18,e.w+12,8,e.hp/e.maxHp,e.isBoss?"#ff6b6b":"#d4b45d");
+  if(e.aimingUntil&&Date.now()<e.aimingUntil){
+    ctx.fillStyle="#ff3939";
+    ctx.font="bold 16px Georgia";
+    ctx.fillText("AIM",e.x+6,e.y-28);
+  }
+}
+
+
+function enemyVariantIndex(e,count=3){return Math.abs((e.id||1)+stageIndex*7)%count}
+function drawBowShape(x,y,left){
+  ctx.fillStyle="#8a6638";
+  if(left){ctx.fillRect(x,y,3,36);ctx.fillRect(x-3,y+5,3,4);ctx.fillRect(x-5,y+11,2,4);ctx.fillRect(x-5,y+22,2,4);ctx.fillRect(x-3,y+29,3,4);ctx.fillStyle="#ece6dd";ctx.fillRect(x+1,y+2,1,31)}
+  else{ctx.fillRect(x,y,3,36);ctx.fillRect(x+3,y+5,3,4);ctx.fillRect(x+6,y+11,2,4);ctx.fillRect(x+6,y+22,2,4);ctx.fillRect(x+3,y+29,3,4);ctx.fillStyle="#ece6dd";ctx.fillRect(x+1,y+2,1,31)}
+}
+function drawQuiverShape(x,y,color="#6f4b2a"){ctx.fillStyle=color;ctx.fillRect(x,y,8,20);ctx.fillStyle="#d8d2c6";ctx.fillRect(x+1,y-4,1,5);ctx.fillRect(x+3,y-6,1,7);ctx.fillRect(x+5,y-5,1,6)}
+function drawSwordShape(x,y,left,blade="#d6d6d6",hilt="#6c4b2c"){ctx.fillStyle=blade;if(left){ctx.fillRect(x-20,y,20,4);ctx.fillStyle=hilt;ctx.fillRect(x-5,y-2,4,8)}else{ctx.fillRect(x,y,20,4);ctx.fillStyle=hilt;ctx.fillRect(x+16,y-2,4,8)}}
+function drawAxeShape(x,y,left,blade="#b9c3cf",handle="#7c5633"){ctx.fillStyle=handle;if(left){ctx.fillRect(x-5,y-18,4,28);ctx.fillStyle=blade;ctx.fillRect(x-17,y-16,12,10)}else{ctx.fillRect(x+1,y-18,4,28);ctx.fillStyle=blade;ctx.fillRect(x+5,y-16,12,10)}}
+function drawHammerShape(x,y,left,head="#aeb4bd",handle="#785437"){ctx.fillStyle=handle;if(left){ctx.fillRect(x-5,y-18,4,28);ctx.fillStyle=head;ctx.fillRect(x-15,y-15,14,8)}else{ctx.fillRect(x+1,y-18,4,28);ctx.fillStyle=head;ctx.fillRect(x+5,y-15,14,8)}}
+function drawDaggerShape(x,y,left,blade="#d9d9de",hilt="#6f5137"){ctx.fillStyle=blade;if(left){ctx.fillRect(x-14,y,14,3);ctx.fillStyle=hilt;ctx.fillRect(x-3,y-2,3,7)}else{ctx.fillRect(x,y,14,3);ctx.fillStyle=hilt;ctx.fillRect(x+11,y-2,3,7)}}
+function drawRoundShield(x,y,color="#bcbec6",cross="#8b2323"){ctx.fillStyle=color;ctx.fillRect(x,y,14,18);ctx.fillStyle=cross;ctx.fillRect(x+6,y+2,2,14);ctx.fillRect(x+2,y+8,10,2)}
+function drawTowerShield(x,y,color="#b9bcc6"){ctx.fillStyle=color;ctx.fillRect(x,y,16,24);ctx.fillStyle="#8b2323";ctx.fillRect(x+6,y+4,3,16);ctx.fillRect(x+3,y+10,10,3)}
+function drawEnemy(e){
+  if(e.invisible)ctx.globalAlpha=.22;
+  drawEnemySprite(e);
+  ctx.globalAlpha=1;
+  drawHpBar(e.x-6,e.y-18,e.w+12,8,e.hp/e.maxHp,e.isBoss?"#ff6b6b":"#d4b45d");
+  if(e.aimingUntil&&Date.now()<e.aimingUntil){ctx.fillStyle="#ff3939";ctx.font="bold 16px Georgia";ctx.fillText("AIM",e.x+6,e.y-28)}
+}
+function drawEnemySprite(e){
+  const env=stage().env;
+  const v=enemyVariantIndex(e,3),style=e.weaponStyle||"default",left=e.facing<0;
+
+  if(e.type==="skeleton"){
+    drawSprite("skeleton",e.x,e.y,true,false,e.facing);
+    drawSwordShape(left?e.x+7:e.x+27,e.y+34,left,"#d9d4ca","#6f5137");return;
+  }
+
+  if(e.type==="bandit"){
+    const cloth=style==="axe"?"#6b5731":style==="hammer"?"#5d3a2a":"#7b4a2e";
+    ctx.fillStyle=cloth;ctx.fillRect(e.x+8,e.y+22,26,34);ctx.fillStyle="#c89166";ctx.fillRect(e.x+10,e.y+4,22,22);ctx.fillStyle="#3f2a1f";ctx.fillRect(e.x+7,e.y,26,10);
+    if(style==="axe")drawAxeShape(left?e.x+7:e.x+35,e.y+38,left,"#b6bec8","#755033");
+    else if(style==="hammer")drawHammerShape(left?e.x+7:e.x+35,e.y+39,left,"#afb5bd","#745032");
+    else drawSwordShape(left?e.x+7:e.x+35,e.y+34,left,"#d0d0d0","#6c4b2c");return;
+  }
+
+  if(e.type==="warrior"){
+    const armor=stage().env==="chapel"?"#62697a":stage().env==="throne"?"#706478":"#59616b";
+    ctx.fillStyle=armor;ctx.fillRect(e.x+8,e.y+22,32,40);ctx.fillStyle="#cfa276";ctx.fillRect(e.x+11,e.y+4,24,22);ctx.fillStyle="#343a42";ctx.fillRect(e.x+8,e.y,28,10);
+    if(style==="shield"){drawRoundShield(left?e.x+34:e.x+2,e.y+29,"#aeb4bf","#7f2328");drawSwordShape(left?e.x+7:e.x+39,e.y+36,left)}
+    else if(style==="axe")drawAxeShape(left?e.x+8:e.x+39,e.y+37,left,"#c1c7cf","#7a5637");
+    else if(style==="hammer")drawHammerShape(left?e.x+8:e.x+39,e.y+38,left,"#c0c6cf","#7a5637");
+    else{ctx.fillStyle="#d8d8dc";if(left){ctx.fillRect(e.x-13,e.y+31,28,6);ctx.fillRect(e.x-18,e.y+33,6,2)}else{ctx.fillRect(e.x+34,e.y+31,28,6);ctx.fillRect(e.x+62,e.y+33,6,2)}}return;
+  }
+
+  if(e.type==="archer"||e.type==="hunterBoss"){
+    const hood=env==="outside"?(v===0?"#51773d":v===1?"#6c7a35":"#476a56"):(v===0?"#50663b":v===1?"#5a4c2f":"#4b5f46");
+    const tunic=env==="outside"?(v===0?"#5f873e":v===1?"#7c6f3a":"#487a65"):(v===0?"#466738":v===1?"#6c5a36":"#3e6257");
+    ctx.fillStyle=tunic;ctx.fillRect(e.x+10,e.y+28,34,44);
+    ctx.fillStyle="#d2a06c";ctx.fillRect(e.x+15,e.y+4,28,28);
+    ctx.fillStyle=hood;ctx.fillRect(e.x+12,e.y,34,12);
+    drawBowShape(e.x+47,e.y+16,false);
+    drawQuiverShape(e.x+7,e.y+18,v===1?"#6a4726":"#5a4023");
+    if(e.type==="hunterBoss"){ctx.fillStyle="#e2c56e";ctx.fillRect(e.x+18,e.y+31,18,4);ctx.fillRect(e.x+24,e.y+25,5,16)}
+    return;
+  }
+
+  if(e.type==="chapelMage"||e.type==="mageBoss"){
+    drawSprite("mage",e.x,e.y,true,false,e.x>player.x?-1:1);
+    if(env==="chapel"){ctx.fillStyle=v===0?"#7fd8ff":v===1?"#a77cff":"#c79bff";ctx.fillRect(e.x+14,e.y+28,18,4)}
+    return;
+  }
+
+  if(e.type==="assassinMinion"||e.type==="assassinBoss"){
+    const cloak=style==="poison"?"#173124":style==="shadow"?"#09090e":"#171821";
+    ctx.fillStyle=cloak;ctx.fillRect(e.x+8,e.y+22,28,40);ctx.fillStyle="#c39472";ctx.fillRect(e.x+10,e.y+4,22,22);ctx.fillStyle="#08080c";ctx.fillRect(e.x+7,e.y,28,10);
+    const blade=style==="poison"?"#78d69b":"#d8dbe0";drawDaggerShape(left?e.x+7:e.x+35,e.y+34,left,blade,"#73553c");
+    if(style==="daggers")drawDaggerShape(left?e.x+35:e.x+7,e.y+40,!left,blade,"#73553c");return;
+  }
+
+  if(e.type==="templarBoss"){drawSprite("templar",e.x,e.y,true,Date.now()<e.thornUntil,e.x>player.x?-1:1);ctx.fillStyle="#dadfe7";ctx.fillRect(e.x+46,e.y+34,8,6);return}
+  if(e.type==="necromancerBoss"){drawSprite("necromancer",e.x,e.y,true,false,e.x>player.x?-1:1);ctx.fillStyle="#caa2ff";ctx.fillRect(e.x+20,e.y+29,18,4);return}
+  if(e.type==="originalHero"){drawSprite("hero",e.x,e.y,true,false,e.x>player.x?-1:1);ctx.fillStyle="#f0d38c";ctx.fillRect(e.x+17,e.y+31,10,4);return}
+  drawSprite("hero",e.x,e.y,true,false)
+}
+function drawSprite(kind,x,y,enemy,thorn=false){
+if(kind==="hero"){
+  ctx.fillStyle=enemy?"#c8b07a":"#8f6f4e";ctx.fillRect(x+8,y+22,26,34);
+  ctx.fillStyle="#d9a46f";ctx.fillRect(x+10,y+4,22,22);
+  ctx.fillStyle="#493321";ctx.fillRect(x+8,y,26,8);
+  ctx.fillStyle="#c6b58f";ctx.fillRect(x+13,y+30,16,6);
+  ctx.fillStyle="#d6d6d6";ctx.fillRect(x+(enemy?-12:34),y+32,24,5);
+  ctx.fillStyle="#222";ctx.fillRect(x+16,y+12,2,2);ctx.fillRect(x+24,y+12,2,2)
+}else if(kind==="hunter"||kind==="hunterBoss"){
+  ctx.fillStyle=enemy?"#466738":"#5f873e";ctx.fillRect(x+10,y+28,34,44);
+  ctx.fillStyle="#d2a06c";ctx.fillRect(x+15,y+4,28,28);
+  ctx.fillStyle="#314526";ctx.fillRect(x+12,y,34,12);
+  ctx.fillStyle="#8a6638";ctx.fillRect(x+48,y+16,4,54);
+  ctx.fillStyle="#e7e7e7";ctx.fillRect(x+51,y+23,1,38);
+  ctx.fillStyle="#5b4023";ctx.fillRect(x+6,y+20,8,20);
+  ctx.fillStyle="#ddd";ctx.fillRect(x+7,y+16,1,8);ctx.fillRect(x+10,y+14,1,10);ctx.fillRect(x+12,y+17,1,7)
+}else if(kind==="templar"||kind==="templarBoss"){
+  ctx.fillStyle=enemy?"#777c86":"#686f7a";ctx.fillRect(x+8,y+24,42,46);
+  ctx.fillStyle="#d9a46f";ctx.fillRect(x+16,y+4,26,26);
+  ctx.fillStyle="#59606b";ctx.fillRect(x+14,y+20,30,10);
+  ctx.fillStyle="#b8bcc8";ctx.fillRect(x+(enemy?2:38),y+28,16,28);
+  ctx.fillStyle="#b22a2a";ctx.fillRect(x+(enemy?8:44),y+32,4,18);ctx.fillRect(x+(enemy?5:41),y+39,10,4);
+  ctx.fillStyle="#d6d6d6";ctx.fillRect(x+(enemy?-18:52),y+34,28,6);
+  ctx.fillStyle="#ececec";ctx.fillRect(x+(enemy?-4:38),y+32,4,4);
+  if(thorn){ctx.fillStyle="#ff4c4c";for(let i=0;i<7;i++)ctx.fillRect(x-10+i*10,y+10+(i%2)*9,6,6)}
+}else if(kind==="mage"||kind==="mageBoss"){
+  ctx.fillStyle=enemy?"#5f3d9b":"#315b9b";ctx.fillRect(x+8,y+22,30,42);
+  ctx.fillStyle="#d9a46f";ctx.fillRect(x+10,y+4,24,22);
+  ctx.fillStyle="#7f6aa8";ctx.fillRect(x+8,y+58,30,8);
+  ctx.fillStyle="#8a6638";ctx.fillRect(x+40,y+8,5,60);
+  ctx.fillStyle="#83d8ff";ctx.fillRect(x+36,y+1,13,13);
+  ctx.fillStyle="#cceeff";ctx.fillRect(x+39,y+4,7,7)
+}else if(kind==="assassin"||kind==="assassinBoss"){
+  ctx.fillStyle=enemy?"#111118":"#1c1c26";ctx.fillRect(x+8,y+22,28,40);
+  ctx.fillStyle="#c39472";ctx.fillRect(x+10,y+4,22,22);
+  ctx.fillStyle="#08080c";ctx.fillRect(x+7,y,28,10);
+  ctx.fillStyle="#4a4a57";ctx.fillRect(x+14,y+24,14,18);
+  ctx.fillStyle="#d6d6d6";ctx.fillRect(x+34,y+34,20,4)
+}else if(kind==="necromancer"||kind==="necromancerBoss"){
+  ctx.fillStyle=enemy?"#44215d":"#5b2680";ctx.fillRect(x+10,y+28,38,44);
+  ctx.fillStyle="#d4c5e3";ctx.fillRect(x+16,y+4,24,24);
+  ctx.fillStyle="#1e1029";ctx.fillRect(x+11,y,38,12);
+  ctx.fillStyle="#8a6638";ctx.fillRect(x+50,y+8,5,60);
+  ctx.fillStyle="#efe4b5";ctx.fillRect(x+45,y+3,14,14);
+  ctx.fillStyle="#2b1b34";ctx.fillRect(x+21,y+13,3,3);ctx.fillRect(x+32,y+13,3,3)
+}else if(kind==="bandit"){
+  ctx.fillStyle="#7b4a2e";ctx.fillRect(x+8,y+22,26,34);
+  ctx.fillStyle="#c89166";ctx.fillRect(x+10,y+4,22,22);
+  ctx.fillStyle="#3f2a1f";ctx.fillRect(x+7,y,26,10)
+}else if(kind==="warrior"){
+  ctx.fillStyle="#62697a";ctx.fillRect(x+8,y+22,32,40);
+  ctx.fillStyle="#cfa276";ctx.fillRect(x+11,y+4,24,22);
+  ctx.fillStyle="#3a3e46";ctx.fillRect(x+8,y,28,10)
+}else if(kind==="skeleton"){
+  ctx.fillStyle="#ece7dd";ctx.fillRect(x+12,y+5,16,18);ctx.fillRect(x+16,y+23,8,26);ctx.fillRect(x+10,y+28,6,18);ctx.fillRect(x+24,y+28,6,18);ctx.fillRect(x+13,y+47,5,16);ctx.fillRect(x+22,y+47,5,16);
+  ctx.fillStyle="#302d35";ctx.fillRect(x+15,y+10,3,3);ctx.fillRect(x+22,y+10,3,3)
+}}
+function drawAllies(){allies.forEach(a=>{drawShadow(a.x,a.y,a.w||34,1);ctx.globalAlpha=.9;drawSprite("skeleton",a.x,a.y,false,false,a.x>player.x?-1:1);ctx.globalAlpha=1;drawHpBar(a.x-4,a.y-14,a.w+8,6,a.hp/7,"#65e07a")})}
+function drawProjectiles(){projectiles.forEach(p=>{
+  if(p.type.includes("Arrow")||p.type==="arrow"){
+    ctx.fillStyle="#d0c4a0";ctx.fillRect(p.x-13,p.y-2,26,4);ctx.fillStyle="#81592a";ctx.fillRect(p.x+8,p.y-3,6,6)
+  }else if(p.type.includes("marksman")){
+    ctx.fillStyle="#ff3939";ctx.fillRect(p.x-18,p.y-3,36,6);ctx.fillStyle="#ffd1d1";ctx.fillRect(p.x-3,p.y-2,6,4)
+  }else if(p.type.includes("Magic")||p.type.includes("Homing")||p.type==="homing"){
+    ctx.fillStyle="#4abfff";ctx.fillRect(p.x-p.r,p.y-p.r,p.r*2,p.r*2);ctx.fillStyle="#dff8ff";ctx.fillRect(p.x-3,p.y-3,6,6);ctx.fillStyle="#8ee9ff";ctx.fillRect(p.x-1,p.y-1,2,2)
+  }else{
+    ctx.fillStyle="#e7e2da";ctx.fillRect(p.x-8,p.y-8,16,16);ctx.fillStyle="#272029";ctx.fillRect(p.x-5,p.y-4,3,3);ctx.fillRect(p.x+2,p.y-4,3,3);ctx.fillStyle="#9a8cbb";ctx.fillRect(p.x-2,p.y+3,4,2)
+  }
+})}
+function drawHud(){
+  ctx.fillStyle="rgba(0,0,0,.58)";ctx.fillRect(14,14,335,168);
+  ctx.strokeStyle="#caa46b";ctx.strokeRect(14,14,335,168);
+  ctx.fillStyle="#ffd98a";ctx.font="18px Georgia";
+  ctx.fillText("Podoba: "+formDef().label,28,40);
+  ctx.fillText("Fáze: "+stage().title,28,66);
+  ctx.fillText("HP: "+player.hp+"/"+player.maxHp,28,92);
+  ctx.fillText("Životy: "+player.lives+"/"+player.maxLives,28,118);
+  ctx.fillText("R: "+formDef().spellName,28,144);ctx.font="14px Georgia";ctx.fillStyle="#cbb899";ctx.fillText(bossFight?"Boss aréna":`${roomName()} — ${roomKills}/${roomTarget()}`,28,165);
+  ctx.fillStyle="#372517";ctx.fillRect(190,78,110,14);
+  ctx.fillStyle="#56be5f";ctx.fillRect(190,78,Math.max(0,110*(player.hp/player.maxHp)),14);
+  ctx.strokeStyle="#d7c8a1";ctx.strokeRect(190,78,110,14);
+  if(playerDead){
+    let s=Math.max(0,Math.ceil((respawnAt-Date.now())/1000));
+    ctx.fillStyle="rgba(0,0,0,.72)";ctx.fillRect(275,145,350,100);
+    ctx.strokeStyle="#ffd98a";ctx.strokeRect(275,145,350,100);
+    ctx.fillStyle="#ffd98a";ctx.font="bold 30px Georgia";ctx.fillText("RESPAWN ZA "+s+" s",330,205)
+  }
+}
+function drawAnimations(){animations.forEach(a=>{let alpha=a.timer/a.maxTimer,lift=(1-alpha)*36;ctx.save();ctx.globalAlpha=alpha;ctx.textAlign="center";if(a.type==="float"){ctx.fillStyle=a.kind==="heal"?"#65e07a":a.kind==="taken"?"#ff6464":a.kind==="ally"?"#65e0ff":"#fff";ctx.font="bold 20px Georgia";ctx.fillText(a.text,a.x,a.y-lift)}else{if(a.type==="boss"||a.type==="phase"){ctx.fillStyle="rgba(0,0,0,.35)";ctx.fillRect(0,0,900,430)}ctx.fillStyle=a.type==="crit"?"#ffd98a":a.type==="boss"?"#ff6b6b":"#7ed7ff";ctx.font=a.type==="boss"?"bold 46px Georgia":"bold 34px Georgia";ctx.fillText(a.text,a.x,a.y-lift)}ctx.restore()})}
+function drawRoomHazard(){
+  if(bossFight||roomCleared)return;const r=currentRoom();if(!r||!r.hazard)return;
+  const map={bog:[340,535,"#456852","#75a069"],spikes:[385,520,"#4a4148","#b8aeb3"],rune:[345,545,"#372859","#8e69d6"],shadow:[315,580,"#14111a","#463657"],necrotic:[365,550,"#34223f","#824b9b"]};
+  const z=map[r.hazard];ctx.fillStyle=z[2];ctx.fillRect(z[0],groundY-5,z[1]-z[0],32);
+  ctx.fillStyle=z[3];
+  if(r.hazard==="spikes"){for(let x=z[0];x<z[1];x+=18){ctx.beginPath();ctx.moveTo(x,groundY);ctx.lineTo(x+9,groundY-18);ctx.lineTo(x+18,groundY);ctx.fill()}}
+  else if(r.hazard==="rune"){for(let x=z[0]+15;x<z[1];x+=42){ctx.fillRect(x,groundY+3,20,3);ctx.fillRect(x+8,groundY-5,3,20)}}
+  else{for(let x=z[0]+8;x<z[1];x+=26)ctx.fillRect(x,groundY+4+(x%3),14,3)}
+}
+function drawExitGate(){
+  if(!roomCleared||bossFight)return;const x=826,y=235;
+  ctx.fillStyle="rgba(230,190,100,.16)";ctx.fillRect(x-16,y-18,78,112);
+  ctx.fillStyle="#332721";ctx.fillRect(x,y,46,92);ctx.fillStyle="#836744";ctx.fillRect(x+5,y+8,36,84);
+  ctx.fillStyle="#d5b668";ctx.fillRect(x+34,y+49,4,4);ctx.fillStyle="#ffe0a0";ctx.font="bold 13px Georgia";ctx.fillText("E",x+17,y-7);
+}
+function drawRoomProps(){
+  if(bossFight)return;const r=currentRoom();if(!r)return;
+  ctx.save();
+  if(r.prop==="ruins"){ctx.fillStyle="#5b5957";ctx.fillRect(92,225,46,20);ctx.fillRect(104,190,16,55);ctx.fillStyle="#344f43";ctx.fillRect(80,238,75,12)}
+  if(r.prop==="marsh"){ctx.fillStyle="#263f37";for(let x=110;x<780;x+=110){ctx.fillRect(x,282,5,45);ctx.fillRect(x-7,289,18,4)}}
+  if(r.prop==="banners"){ctx.fillStyle="#782d34";ctx.fillRect(120,120,32,95);ctx.fillRect(740,120,32,95);ctx.fillStyle="#c5a256";ctx.fillRect(130,145,12,18);ctx.fillRect(750,145,12,18)}
+  if(r.prop==="chains"){ctx.fillStyle="#77737b";for(let y=90;y<245;y+=16){ctx.fillRect(170,y,5,9);ctx.fillRect(720,y+7,5,9)}}
+  if(r.prop==="pews"){ctx.fillStyle="#5d432f";for(let x=110;x<760;x+=145){ctx.fillRect(x,260,90,12);ctx.fillRect(x+8,272,7,35);ctx.fillRect(x+75,272,7,35)}}
+  if(r.prop==="altar"){ctx.fillStyle="#786470";ctx.fillRect(390,220,120,26);ctx.fillRect(410,246,18,62);ctx.fillRect(475,246,18,62);ctx.fillStyle="#b89d62";ctx.fillRect(437,195,26,25)}
+  if(r.prop==="cells"){ctx.fillStyle="#56515b";for(let x=105;x<780;x+=210){for(let i=0;i<5;i++)ctx.fillRect(x+i*12,125,4,115);ctx.fillRect(x,125,55,5);ctx.fillRect(x,235,55,5)}}
+  if(r.prop==="pit"){ctx.fillStyle="#09070b";ctx.fillRect(340,278,220,48);ctx.fillStyle="#44324d";ctx.fillRect(355,285,190,6)}
+  if(r.prop==="statues"){ctx.fillStyle="#61596b";for(let x of [140,710]){ctx.fillRect(x,155,42,94);ctx.fillRect(x+8,120,26,35);ctx.fillRect(x-8,249,58,16)}}
+  if(r.prop==="throne"){ctx.fillStyle="#6d4a86";ctx.fillRect(410,150,80,100);ctx.fillStyle="#d0aa55";ctx.fillRect(430,170,40,16)}
+  ctx.restore()
+}
+function drawAmbientParticles(){
+  const env=stage().env,colors={outside:"#c6e2ae",gate:"#c2a98b",chapel:"#8edbff",dungeon:"#e0a35a",throne:"#b67ed8",mirror:"#d8c0e8"};
+  ctx.fillStyle=colors[env]||"#ddd";ctx.globalAlpha=.45;ambientParticles.forEach(p=>ctx.fillRect(p.x,p.y,p.size,p.size));ctx.globalAlpha=1
+}
+function drawVignette(){
+  const g=ctx.createRadialGradient(450,210,120,450,210,520);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(1,"rgba(0,0,0,.42)");ctx.fillStyle=g;ctx.fillRect(0,0,900,430)
+}
+function drawGame(){drawBackground();drawRoomProps();drawRoomHazard();drawPlatforms();drawExitGate();drawAmbientParticles();drawPlayer();drawAllies();enemies.forEach(drawEnemy);drawProjectiles();drawVignette();drawHud();drawAnimations()}
+function loop(){updateGame();drawGame();requestAnimationFrame(loop)}
+
+function closeIntro(){closeStoryPanel()}
+document.addEventListener("keydown",e=>{
+  if(menuOpen)return;
+  if(introOpen||storyOpen){
+    if(e.key==="Enter"||e.key===" "){e.preventDefault();closeStoryPanel()}
+    return;
+  }
+  if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")keys.left=true;
+  if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")keys.right=true;
+  if(e.key==="ArrowUp"||e.key.toLowerCase()==="w"){if(!e.repeat)jumpPlayer()}
+  if(e.code==="Space"){e.preventDefault();playerAttack()}
+  if(e.key.toLowerCase()==="r"){if(!e.repeat)useSpell()}
+  if(e.key.toLowerCase()==="l")skipLevel();
+  if(e.key.toLowerCase()==="e"&&roomCleared)advanceRoom()
+});
+document.addEventListener("keyup",e=>{
+  if(menuOpen||introOpen||storyOpen) return;
+  if(e.key==="ArrowLeft"||e.key.toLowerCase()==="a")keys.left=false;
+  if(e.key==="ArrowRight"||e.key.toLowerCase()==="d")keys.right=false
+});
+document.getElementById("restartBtn").addEventListener("click",restart);
+document.getElementById("skipBtn").addEventListener("click",skipLevel);
+if(startStoryBtn) startStoryBtn.addEventListener("click",closeStoryPanel);
+newGameBtn.addEventListener("click",newGame);
+continueBtn.addEventListener("click",continueGame);
+exportSaveBtn.addEventListener("click",exportSave);
+importSaveBtn.addEventListener("click",()=>importSaveInput.click());
+deleteSaveBtn.addEventListener("click",()=>{if(confirm("Opravdu smazat uloženou hru?")){safeStorageRemove();refreshSaveUi()}});
+importSaveInput.addEventListener("change",()=>{const f=importSaveInput.files&&importSaveInput.files[0];if(f)importSaveFile(f);importSaveInput.value=""});
+resetRuntime();initAmbientParticles();showMainMenu();refreshSaveUi();loop();
+
+})();
+</script>
+</body>
+</html>
